@@ -1,0 +1,66 @@
+import { BrowserRouter, Routes, Route, useLocation } from 'react-router-dom';
+import { ThemeProvider } from '@mui/material/styles';
+import CssBaseline from '@mui/material/CssBaseline';
+import { AnimatePresence, motion } from 'framer-motion';
+import theme from './theme';
+
+import HomePage from './pages/HomePage';
+import DirectoryPage from './pages/directory/DirectoryPage';
+import DirectoryDetailPage from './pages/directory/DirectoryDetailPage';
+import CoursesPage from './pages/courses/CoursesPage';
+import CourseDetailPage from './pages/courses/CourseDetailPage';
+import LearningPage from './pages/learning/LearningPage';
+import VideoPlayerPage from './pages/learning/VideoPlayerPage';
+import ProfilePage from './pages/ProfilePage';
+import CreatorDashboard from './pages/creator/CreatorDashboard';
+import UploadCoursePage from './pages/creator/UploadCoursePage';
+import AdminPanel from './pages/admin/AdminPanel';
+
+const pageVariants = {
+  initial: { opacity: 0, y: 8 },
+  animate: { opacity: 1, y: 0 },
+  exit: { opacity: 0, y: -8 },
+};
+
+function AnimatedRoutes() {
+  const location = useLocation();
+  return (
+    <AnimatePresence mode="wait">
+      <motion.div
+        key={location.pathname.split('/')[1] || 'home'}
+        variants={pageVariants}
+        initial="initial"
+        animate="animate"
+        exit="exit"
+        transition={{ duration: 0.25, ease: 'easeInOut' }}
+      >
+        <Routes location={location}>
+          <Route path="/" element={<HomePage />} />
+          <Route path="/directory" element={<DirectoryPage />} />
+          <Route path="/directory/:slug" element={<DirectoryDetailPage />} />
+          <Route path="/courses" element={<CoursesPage />} />
+          <Route path="/courses/:id" element={<CourseDetailPage />} />
+          <Route path="/learning" element={<LearningPage />} />
+          <Route path="/learning/:courseId" element={<VideoPlayerPage />} />
+          <Route path="/profile" element={<ProfilePage />} />
+          <Route path="/creator" element={<CreatorDashboard />} />
+          <Route path="/creator/upload" element={<UploadCoursePage />} />
+          <Route path="/admin" element={<AdminPanel />} />
+        </Routes>
+      </motion.div>
+    </AnimatePresence>
+  );
+}
+
+function App() {
+  return (
+    <ThemeProvider theme={theme}>
+      <CssBaseline />
+      <BrowserRouter>
+        <AnimatedRoutes />
+      </BrowserRouter>
+    </ThemeProvider>
+  );
+}
+
+export default App;

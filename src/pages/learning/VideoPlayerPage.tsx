@@ -1,0 +1,535 @@
+import { useState, useEffect } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
+import Box from '@mui/material/Box';
+import Container from '@mui/material/Container';
+import Typography from '@mui/material/Typography';
+import Grid from '@mui/material/Grid';
+import List from '@mui/material/List';
+import ListItem from '@mui/material/ListItem';
+import ListItemIcon from '@mui/material/ListItemIcon';
+import ListItemText from '@mui/material/ListItemText';
+import ListItemButton from '@mui/material/ListItemButton';
+import Button from '@mui/material/Button';
+import LinearProgress from '@mui/material/LinearProgress';
+import Chip from '@mui/material/Chip';
+import IconButton from '@mui/material/IconButton';
+import Tabs from '@mui/material/Tabs';
+import Tab from '@mui/material/Tab';
+import Divider from '@mui/material/Divider';
+import Accordion from '@mui/material/Accordion';
+import AccordionSummary from '@mui/material/AccordionSummary';
+import AccordionDetails from '@mui/material/AccordionDetails';
+import Snackbar from '@mui/material/Snackbar';
+import Alert from '@mui/material/Alert';
+import ArrowBackIcon from '@mui/icons-material/ArrowBack';
+import PlayCircleIcon from '@mui/icons-material/PlayCircle';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import LockIcon from '@mui/icons-material/Lock';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import SkipNextIcon from '@mui/icons-material/SkipNext';
+import SkipPreviousIcon from '@mui/icons-material/SkipPrevious';
+import SpeedIcon from '@mui/icons-material/Speed';
+import { motion } from 'framer-motion';
+import PageLayout from '../../components/PageLayout';
+import { useCourseStore } from '../../stores/courseStore';
+import { useProgressStore } from '../../stores/progressStore';
+import type { Lesson } from '../../data/courses';
+
+export default function VideoPlayerPage() {
+  const { courseId } = useParams<{ courseId: string }>();
+  const navigate = useNavigate();
+  const { getCourseById, isEnrolled } = useCourseStore();
+  const { markComplete, isCompleted, getCourseProgress, setCurrentLesson, getCurrentLesson } = useProgressStore();
+
+  const [activeLesson, setActiveLesson] = useState<Lesson | null>(null);
+  const [activeSectionId, setActiveSectionId] = useState('');
+  const [playing, setPlaying] = useState(false);
+  const [fakeProgress, setFakeProgress] = useState(0);
+  const [tab, setTab] = useState(0);
+  const [toast, setToast] = useState({ open: false, message: '' });
+  const [speed, setSpeed] = useState(1);
+  const [notes, setNotes] = useState('');
+  const [showCongrats, setShowCongrats] = useState(false);
+
+  const course = getCourseById(courseId || '');
+  const enrolled = isEnrolled(courseId || '');
+
+  useEffect(() => {
+    if (course) {
+      const savedId = getCurrentLesson(courseId || '');
+      let found: Lesson | null = null;
+      let sectionId = '';
+
+      if (savedId) {
+        for (const section of course.curriculum) {
+          const lesson = section.lessons.find(l => l.id === savedId);
+          if (lesson) { found = lesson; sectionId = section.id; break; }
+        }
+      }
+
+      if (!found && course.curriculum[0]?.lessons[0]) {
+        found = course.curriculum[0].lessons[0];
+        sectionId = course.curriculum[0].id;
+      }
+
+      setActiveLesson(found);
+      setActiveSectionId(sectionId);
+    }
+  }, [course, courseId, getCurrentLesson]);
+
+  useEffect(() => {
+    let interval: ReturnType<typeof setInterval>;
+    if (playing && fakeProgress < 100) {
+      interval = setInterval(() => {
+        setFakeProgress(p => {
+          if (p >= 100) {
+            setPlaying(false);
+            clearInterval(interval);
+            return 100;
+          }
+          return p + speed * 0.5;
+        });
+      }, 300);
+    }
+    return () => clearInterval(interval);
+  }, [playing, fakeProgress, speed]);
+
+  if (!course) {
+    return (
+      <PageLayout>
+        <Container maxWidth="md" sx={{ py: 10, textAlign: 'center' }}>
+          <Typography variant="h5">Course not found</Typography>
+          <Button onClick={() => navigate('/learning')}>My Learning</Button>
+        </Container>
+      </PageLayout>
+    );
+  }
+
+  if (!enrolled) {
+    return (
+      <PageLayout>
+        <Container maxWidth="sm" sx={{ py: 12, textAlign: 'center' }}>
+          <Typography sx={{ fontSize: '3rem', mb: 2 }}>🔒</Typography>
+          <Typography variant="h5" fontWeight={700} mb={2}>Enroll to access this course</Typography>
+          <Button variant="contained" color="primary" onClick={() => navigate(`/courses/${courseId}`)}>
+            Go to Course Page
+          </Button>
+        </Container>
+      </PageLayout>
+    );
+  }
+
+  const allLessons = course.curriculum.flatMap(s => s.lessons);
+  const currentIndex = allLessons.findIndex(l => l.id === activeLesson?.id);
+  const prevLesson = currentIndex > 0 ? allLessons[currentIndex - 1] : null;
+  const nextLesson = currentIndex < allLessons.length - 1 ? allLessons[currentIndex + 1] : null;
+  const progress = getCourseProgress(courseId || '', course.totalLessons);
+
+  const selectLesson = (lesson: Lesson, sectionId: string) => {
+    setActiveLesson(lesson);
+    setActiveSectionId(sectionId);
+    setPlaying(false);
+    setFakeProgress(isCompleted(courseId || '', lesson.id) ? 100 : 0);
+    setCurrentLesson(courseId || '', lesson.id);
+  };
+
+  const handleMarkComplete = () => {
+    if (!activeLesson) return;
+    markComplete(courseId || '', activeLesson.id);
+    setToast({ open: true, message: `✅ "${activeLesson.title}" marked as complete!` });
+    if (progress >= 90) setShowCongrats(true);
+    if (nextLesson) {
+      const section = course.curriculum.find(s => s.lessons.some(l => l.id === nextLesson.id));
+      if (section) selectLesson(nextLesson, section.id);
+    }
+  };
+
+  return (
+    <PageLayout noPadding>
+      <Box sx={{ bgcolor: '#0A1628', minHeight: { xs: 'auto', md: '100vh' } }}>
+        {/* Top bar */}
+        <Box sx={{ bgcolor: '#111827', px: 2, py: 1, display: 'flex', alignItems: 'center', gap: 2, borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
+          <IconButton onClick={() => navigate('/learning')} sx={{ color: 'white', '&:hover': { bgcolor: 'rgba(255,255,255,0.1)' } }}>
+            <ArrowBackIcon />
+          </IconButton>
+          <Typography variant="subtitle2" sx={{ color: 'white', flex: 1, fontSize: '0.85rem' }} noWrap>
+            {course.title}
+          </Typography>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <LinearProgress
+              variant="determinate"
+              value={progress}
+              sx={{ width: 80, height: 4, borderRadius: 2, bgcolor: 'rgba(255,255,255,0.1)', '& .MuiLinearProgress-bar': { bgcolor: '#D4A017' } }}
+            />
+            <Typography variant="caption" sx={{ color: '#D4A017', fontWeight: 600 }}>{progress}%</Typography>
+          </Box>
+        </Box>
+
+        <Grid container sx={{ minHeight: 'calc(100vh - 120px)' }}>
+          {/* Video Area */}
+          <Grid size={{ xs: 12, md: 8 }}>
+            {/* Fake Video Player */}
+            <Box
+              sx={{
+                bgcolor: '#000',
+                aspectRatio: '16/9',
+                position: 'relative',
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'center',
+                cursor: 'pointer',
+              }}
+              onClick={() => setPlaying(p => !p)}
+            >
+              {/* Background gradient */}
+              <Box sx={{ position: 'absolute', inset: 0, background: 'linear-gradient(135deg, #0E5B44 0%, #093D2E 100%)', opacity: 0.8 }} />
+              <Box sx={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 2, zIndex: 1 }}>
+                <Typography sx={{ fontSize: '3rem' }}>🌿</Typography>
+                <Typography variant="h6" sx={{ color: 'white', textAlign: 'center', fontWeight: 600, px: 3 }}>
+                  {activeLesson?.title}
+                </Typography>
+                <motion.div animate={{ scale: playing ? 0.9 : 1 }} transition={{ repeat: playing ? Infinity : 0, repeatType: 'reverse', duration: 0.8 }}>
+                  <Box
+                    sx={{
+                      width: 64,
+                      height: 64,
+                      borderRadius: '50%',
+                      bgcolor: 'rgba(255,255,255,0.2)',
+                      border: '2px solid rgba(255,255,255,0.5)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      cursor: 'pointer',
+                      backdropFilter: 'blur(10px)',
+                    }}
+                  >
+                    <Typography sx={{ fontSize: '1.8rem', ml: playing ? 0 : 0.5 }}>
+                      {playing ? '⏸' : '▶'}
+                    </Typography>
+                  </Box>
+                </motion.div>
+                {playing && (
+                  <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.7)' }}>
+                    Click to pause
+                  </Typography>
+                )}
+              </Box>
+
+              {/* Progress bar on video */}
+              <Box sx={{ position: 'absolute', bottom: 0, left: 0, right: 0, p: 1.5, zIndex: 2 }}>
+                <LinearProgress
+                  variant="determinate"
+                  value={fakeProgress}
+                  sx={{
+                    height: 3,
+                    bgcolor: 'rgba(255,255,255,0.2)',
+                    '& .MuiLinearProgress-bar': { bgcolor: '#D4A017' },
+                  }}
+                />
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 0.5 }}>
+                  <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.6)' }}>
+                    {Math.round(fakeProgress / 100 * 12)}:30 / {activeLesson?.duration}
+                  </Typography>
+                  <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
+                    <SpeedIcon sx={{ fontSize: 14, color: 'rgba(255,255,255,0.6)' }} />
+                    <Box sx={{ display: 'flex', gap: 0.5 }}>
+                      {[0.75, 1, 1.25, 1.5, 2].map(s => (
+                        <Box
+                          key={s}
+                          onClick={e => { e.stopPropagation(); setSpeed(s); }}
+                          sx={{
+                            px: 0.75,
+                            py: 0.25,
+                            borderRadius: 0.5,
+                            bgcolor: speed === s ? '#D4A017' : 'rgba(255,255,255,0.1)',
+                            color: 'white',
+                            fontSize: '0.6rem',
+                            cursor: 'pointer',
+                            fontWeight: speed === s ? 700 : 400,
+                          }}
+                        >
+                          {s}x
+                        </Box>
+                      ))}
+                    </Box>
+                  </Box>
+                </Box>
+              </Box>
+            </Box>
+
+            {/* Controls Below Video */}
+            <Box sx={{ bgcolor: '#111827', p: 2, borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 2 }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <IconButton
+                    disabled={!prevLesson}
+                    onClick={() => {
+                      if (prevLesson) {
+                        const section = course.curriculum.find(s => s.lessons.some(l => l.id === prevLesson.id));
+                        if (section) selectLesson(prevLesson, section.id);
+                      }
+                    }}
+                    sx={{ color: 'white', '&:disabled': { color: 'rgba(255,255,255,0.2)' } }}
+                  >
+                    <SkipPreviousIcon />
+                  </IconButton>
+                  <IconButton
+                    disabled={!nextLesson}
+                    onClick={() => {
+                      if (nextLesson) {
+                        const section = course.curriculum.find(s => s.lessons.some(l => l.id === nextLesson.id));
+                        if (section) selectLesson(nextLesson, section.id);
+                      }
+                    }}
+                    sx={{ color: 'white', '&:disabled': { color: 'rgba(255,255,255,0.2)' } }}
+                  >
+                    <SkipNextIcon />
+                  </IconButton>
+                </Box>
+
+                <Button
+                  variant="contained"
+                  startIcon={<CheckCircleIcon />}
+                  onClick={handleMarkComplete}
+                  disabled={isCompleted(courseId || '', activeLesson?.id || '')}
+                  sx={{
+                    bgcolor: '#D4A017',
+                    '&:hover': { bgcolor: '#A07810' },
+                    '&:disabled': { bgcolor: '#16A34A', color: 'white', opacity: 0.8 },
+                    borderRadius: 2,
+                  }}
+                >
+                  {isCompleted(courseId || '', activeLesson?.id || '') ? 'Completed ✓' : 'Mark Complete'}
+                </Button>
+              </Box>
+            </Box>
+
+            {/* Bottom Tabs */}
+            <Box sx={{ bgcolor: '#111827' }}>
+              <Tabs
+                value={tab}
+                onChange={(_e, v) => setTab(v)}
+                sx={{
+                  borderBottom: '1px solid rgba(255,255,255,0.08)',
+                  '& .MuiTab-root': { color: 'rgba(255,255,255,0.5)', '&.Mui-selected': { color: 'white' } },
+                  '& .MuiTabs-indicator': { bgcolor: '#D4A017' },
+                }}
+              >
+                <Tab label="Notes" />
+                <Tab label="Resources" />
+                <Tab label="About" />
+              </Tabs>
+
+              <Box sx={{ p: 2, minHeight: 150 }}>
+                {tab === 0 && (
+                  <Box>
+                    <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.5)', mb: 1, display: 'block' }}>
+                      Take notes for this lesson
+                    </Typography>
+                    <Box
+                      component="textarea"
+                      value={notes}
+                      onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setNotes(e.target.value)}
+                      placeholder="Your notes here..."
+                      style={{
+                        width: '100%',
+                        minHeight: 120,
+                        background: 'rgba(255,255,255,0.05)',
+                        border: '1px solid rgba(255,255,255,0.1)',
+                        borderRadius: 8,
+                        padding: '12px',
+                        color: 'white',
+                        fontSize: '0.85rem',
+                        outline: 'none',
+                        resize: 'vertical',
+                        fontFamily: 'inherit',
+                      }}
+                    />
+                  </Box>
+                )}
+                {tab === 1 && (
+                  <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                    <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.5)', mb: 1, display: 'block' }}>
+                      Downloadable resources
+                    </Typography>
+                    {['Lecture Notes PDF', 'Sanskrit Glossary', 'Quick Reference Chart'].map((res, i) => (
+                      <Box
+                        key={i}
+                        sx={{
+                          p: 1.5,
+                          bgcolor: 'rgba(255,255,255,0.05)',
+                          borderRadius: 2,
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 2,
+                          cursor: 'pointer',
+                          '&:hover': { bgcolor: 'rgba(255,255,255,0.08)' },
+                        }}
+                      >
+                        <Typography>📄</Typography>
+                        <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.8)' }}>{res}</Typography>
+                        <Chip label="PDF" size="small" sx={{ ml: 'auto', bgcolor: 'rgba(220,38,38,0.2)', color: '#FCA5A5', fontSize: '0.6rem', height: 18 }} />
+                      </Box>
+                    ))}
+                  </Box>
+                )}
+                {tab === 2 && (
+                  <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.6)', lineHeight: 1.7 }}>
+                    {course.description.slice(0, 300)}...
+                  </Typography>
+                )}
+              </Box>
+            </Box>
+          </Grid>
+
+          {/* Lesson List Sidebar */}
+          <Grid
+            size={{ xs: 12, md: 4 }}
+            sx={{
+              bgcolor: '#111827',
+              borderLeft: '1px solid rgba(255,255,255,0.08)',
+              overflow: 'auto',
+              maxHeight: { md: 'calc(100vh - 120px)' },
+            }}
+          >
+            <Box sx={{ p: 2, borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
+              <Typography variant="subtitle2" sx={{ color: 'white', fontWeight: 700 }}>
+                Course Contents
+              </Typography>
+              <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.5)' }}>
+                {allLessons.filter(l => isCompleted(courseId || '', l.id)).length}/{allLessons.length} lessons completed
+              </Typography>
+            </Box>
+
+            {course.curriculum.map(section => (
+              <Accordion
+                key={section.id}
+                expanded={activeSectionId === section.id}
+                onChange={() => setActiveSectionId(s => s === section.id ? '' : section.id)}
+                sx={{ bgcolor: 'transparent', '&:before': { display: 'none' }, boxShadow: 'none' }}
+              >
+                <AccordionSummary
+                  expandIcon={<ExpandMoreIcon sx={{ color: 'rgba(255,255,255,0.5)', fontSize: 18 }} />}
+                  sx={{
+                    px: 2,
+                    py: 1,
+                    bgcolor: 'rgba(255,255,255,0.03)',
+                    '&:hover': { bgcolor: 'rgba(255,255,255,0.05)' },
+                    minHeight: '48px !important',
+                    '& .MuiAccordionSummary-content': { my: '8px !important' },
+                  }}
+                >
+                  <Box>
+                    <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.9)', fontWeight: 600, fontSize: '0.82rem' }}>
+                      {section.title}
+                    </Typography>
+                    <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.4)', fontSize: '0.7rem' }}>
+                      {section.lessons.length} lessons
+                    </Typography>
+                  </Box>
+                </AccordionSummary>
+                <AccordionDetails sx={{ p: 0 }}>
+                  <List dense sx={{ p: 0 }}>
+                    {section.lessons.map(lesson => {
+                      const completed = isCompleted(courseId || '', lesson.id);
+                      const active = lesson.id === activeLesson?.id;
+                      return (
+                        <ListItem key={lesson.id} disablePadding>
+                          <ListItemButton
+                            onClick={() => selectLesson(lesson, section.id)}
+                            sx={{
+                              px: 2,
+                              py: 1,
+                              bgcolor: active ? 'rgba(212,160,23,0.15)' : 'transparent',
+                              borderLeft: active ? '3px solid #D4A017' : '3px solid transparent',
+                              '&:hover': { bgcolor: 'rgba(255,255,255,0.05)' },
+                            }}
+                          >
+                            <ListItemIcon sx={{ minWidth: 28 }}>
+                              {completed ? (
+                                <CheckCircleIcon sx={{ fontSize: 16, color: '#16A34A' }} />
+                              ) : active ? (
+                                <PlayCircleIcon sx={{ fontSize: 16, color: '#D4A017' }} />
+                              ) : (
+                                <LockIcon sx={{ fontSize: 14, color: 'rgba(255,255,255,0.3)' }} />
+                              )}
+                            </ListItemIcon>
+                            <ListItemText
+                              primary={lesson.title}
+                              secondary={lesson.duration}
+                              primaryTypographyProps={{
+                                variant: 'caption',
+                                sx: { color: active ? '#D4A017' : 'rgba(255,255,255,0.7)', fontWeight: active ? 600 : 400, fontSize: '0.78rem' },
+                              }}
+                              secondaryTypographyProps={{
+                                sx: { color: 'rgba(255,255,255,0.3)', fontSize: '0.68rem' },
+                              }}
+                            />
+                          </ListItemButton>
+                          <Divider sx={{ borderColor: 'rgba(255,255,255,0.04)' }} />
+                        </ListItem>
+                      );
+                    })}
+                  </List>
+                </AccordionDetails>
+              </Accordion>
+            ))}
+          </Grid>
+        </Grid>
+      </Box>
+
+      {showCongrats && (
+        <Box
+          sx={{
+            position: 'fixed',
+            inset: 0,
+            bgcolor: 'rgba(0,0,0,0.7)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 9999,
+          }}
+          onClick={() => setShowCongrats(false)}
+        >
+          <motion.div
+            initial={{ scale: 0, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            transition={{ type: 'spring', damping: 10 }}
+          >
+            <Box
+              sx={{
+                bgcolor: 'white',
+                borderRadius: 4,
+                p: 4,
+                textAlign: 'center',
+                maxWidth: 360,
+                mx: 2,
+              }}
+            >
+              <Typography sx={{ fontSize: '3rem', mb: 1 }}>🎉</Typography>
+              <Typography variant="h5" fontWeight={700} mb={1} color="primary.main">
+                Amazing Progress!
+              </Typography>
+              <Typography variant="body1" color="text.secondary" mb={3}>
+                You're almost done with this course! Keep going!
+              </Typography>
+              <Button variant="contained" color="primary" onClick={() => setShowCongrats(false)}>
+                Continue Learning
+              </Button>
+            </Box>
+          </motion.div>
+        </Box>
+      )}
+
+      <Snackbar
+        open={toast.open}
+        autoHideDuration={2000}
+        onClose={() => setToast(t => ({ ...t, open: false }))}
+        anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
+      >
+        <Alert severity="success" sx={{ borderRadius: 2 }}>{toast.message}</Alert>
+      </Snackbar>
+    </PageLayout>
+  );
+}
