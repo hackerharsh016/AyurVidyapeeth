@@ -2,7 +2,11 @@ import { BrowserRouter, Routes, Route, useLocation } from 'react-router-dom';
 import { ThemeProvider } from '@mui/material/styles';
 import CssBaseline from '@mui/material/CssBaseline';
 import { AnimatePresence, motion } from 'framer-motion';
+import { useEffect } from 'react';
 import theme from './theme';
+import { useAuthStore } from './stores/authStore';
+import { useCourseStore } from './stores/courseStore';
+import { supabase } from './supabase/supabase';
 
 import HomePage from './pages/HomePage';
 import DirectoryPage from './pages/directory/DirectoryPage';
@@ -53,6 +57,27 @@ function AnimatedRoutes() {
 }
 
 function App() {
+  const { initializeSession } = useAuthStore();
+  const { fetchCourses, fetchUserEnrollments, fetchWishlist } = useCourseStore();
+
+  useEffect(() => {
+    fetchCourses();
+    initializeSession().then(() => {
+      fetchUserEnrollments();
+      fetchWishlist();
+    });
+    
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      initializeSession();
+      if (session) {
+        fetchUserEnrollments();
+        fetchWishlist();
+      }
+    });
+
+    return () => subscription.unsubscribe();
+  }, [initializeSession, fetchCourses, fetchUserEnrollments, fetchWishlist]);
+
   return (
     <ThemeProvider theme={theme}>
       <CssBaseline />

@@ -33,14 +33,13 @@ export default function AuthModal({ open, mode, onClose, onSwitchMode }: Props) 
     e.preventDefault();
     setError('');
     setLoading(true);
-    await new Promise(r => setTimeout(r, 600));
-    const success = login(loginForm.email, loginForm.password);
+    const success = await login(loginForm.email, loginForm.password);
     setLoading(false);
     if (success) {
       onClose();
       navigate('/');
     } else {
-      setError('Invalid credentials. Try: student@ayurvidyapeeth.com or admin@ayurvidyapeeth.com with any password.');
+      setError('Invalid credentials.');
     }
   };
 
@@ -52,8 +51,7 @@ export default function AuthModal({ open, mode, onClose, onSwitchMode }: Props) 
       return;
     }
     setLoading(true);
-    await new Promise(r => setTimeout(r, 600));
-    const success = signup(signupForm);
+    const success = await signup(signupForm);
     setLoading(false);
     if (success) {
       onClose();

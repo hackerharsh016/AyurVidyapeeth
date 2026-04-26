@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
+import { supabase } from '../supabase/supabase';
 
 export interface AuthUser {
   id: string;
@@ -15,96 +15,81 @@ export interface AuthUser {
 interface AuthState {
   user: AuthUser | null;
   isAuthenticated: boolean;
-  login: (email: string, _password: string) => boolean;
-  signup: (data: { name: string; email: string; college: string; year: string; password: string }) => boolean;
-  logout: () => void;
-  updateProfile: (data: Partial<AuthUser>) => void;
+  login: (email: string, password: string) => Promise<boolean>;
+  signup: (data: { name: string; email: string; college: string; year: string; password: string }) => Promise<boolean>;
+  logout: () => Promise<void>;
+  updateProfile: (data: Partial<AuthUser>) => Promise<void>;
+  initializeSession: () => Promise<void>;
 }
 
-const generateId = () => Math.random().toString(36).substr(2, 9);
-const generateAvatar = (name: string) => name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
+export const useAuthStore = create<AuthState>()((set, get) => ({
+  user: null,
+  isAuthenticated: false,
 
-export const useAuthStore = create<AuthState>()(
-  persist(
-    (set, get) => ({
-      user: null,
-      isAuthenticated: false,
-
-      login: (email: string, _password: string) => {
-        // Simulate login with mock credentials
-        const mockAccounts: Record<string, AuthUser> = {
-          'admin@ayurvidyapeeth.com': {
-            id: 'admin1', name: 'Admin User', email: 'admin@ayurvidyapeeth.com',
-            college: 'AyurVidyapeeth', year: 'Admin', role: 'admin', avatar: 'AU', bio: 'Platform administrator',
+  initializeSession: async () => {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (session?.user) {
+      const { data: profile } = await supabase.from('profiles').select('*').eq('id', session.user.id).single();
+      if (profile) {
+        set({
+          user: {
+            id: profile.id,
+            name: profile.full_name || '',
+            email: profile.email || '',
+            college: profile.college || '',
+            year: profile.year || '',
+            role: (profile.role as 'student' | 'creator' | 'admin') || 'student',
+            avatar: profile.avatar_url || '',
+            bio: '',
           },
-          'creator@ayurvidyapeeth.com': {
-            id: 'creator1', name: 'Dr. Priya Sharma', email: 'creator@ayurvidyapeeth.com',
-            college: 'Gujarat Ayurved University', year: 'Faculty', role: 'creator', avatar: 'PS',
-            bio: 'PhD in Dravyaguna, 15+ years teaching experience.',
-          },
-          'student@ayurvidyapeeth.com': {
-            id: 'u1', name: 'Arjun Sharma', email: 'student@ayurvidyapeeth.com',
-            college: 'Banaras Hindu University', year: '3rd Year BAMS', role: 'student', avatar: 'AS',
-            bio: 'Passionate Ayurveda student.',
-          },
-        };
+          isAuthenticated: true,
+        });
+      }
+    }
+  },
 
-        const mockUser = mockAccounts[email.toLowerCase()];
-        if (mockUser) {
-          set({ user: mockUser, isAuthenticated: true });
-          return true;
-        }
+  login: async (email: string, password: string) => {
+    const { data: { session }, error } = await supabase.auth.signInWithPassword({ email, password });
+    if (error || !session) return false;
+    
+    await get().initializeSession();
+    return true;
+  },
 
-        // Check localStorage for registered users
-        const stored = localStorage.getItem('ayurvidya_users');
-        if (stored) {
-          const users: AuthUser[] = JSON.parse(stored);
-          const found = users.find(u => u.email.toLowerCase() === email.toLowerCase());
-          if (found) {
-            set({ user: found, isAuthenticated: true });
-            return true;
-          }
-        }
-
-        return false;
-      },
-
-      signup: (data) => {
-        const existing = get().user;
-        if (existing?.email === data.email) return false;
-
-        const newUser: AuthUser = {
-          id: generateId(),
-          name: data.name,
-          email: data.email,
+  signup: async (data) => {
+    const { data: authData, error } = await supabase.auth.signUp({
+      email: data.email,
+      password: data.password,
+      options: {
+        data: {
+          full_name: data.name,
           college: data.college,
           year: data.year,
-          role: 'student',
-          avatar: generateAvatar(data.name),
-          bio: '',
-        };
+        }
+      }
+    });
 
-        // Store in localStorage
-        const stored = localStorage.getItem('ayurvidya_users');
-        const users: AuthUser[] = stored ? JSON.parse(stored) : [];
-        users.push(newUser);
-        localStorage.setItem('ayurvidya_users', JSON.stringify(users));
+    if (error || !authData.user) return false;
+    
+    await get().initializeSession();
+    return true;
+  },
 
-        set({ user: newUser, isAuthenticated: true });
-        return true;
-      },
+  logout: async () => {
+    await supabase.auth.signOut();
+    set({ user: null, isAuthenticated: false });
+  },
 
-      logout: () => {
-        set({ user: null, isAuthenticated: false });
-      },
-
-      updateProfile: (data) => {
-        const current = get().user;
-        if (!current) return;
-        const updated = { ...current, ...data };
-        set({ user: updated });
-      },
-    }),
-    { name: 'ayurvidya_auth' }
-  )
-);
+  updateProfile: async (data) => {
+    const current = get().user;
+    if (!current) return;
+    
+    await supabase.from('profiles').update({
+      full_name: data.name,
+      college: data.college,
+      year: data.year,
+    }).eq('id', current.id);
+    
+    await get().initializeSession();
+  },
+}));

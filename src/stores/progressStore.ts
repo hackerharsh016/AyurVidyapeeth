@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
+import { supabase } from '../supabase/supabase';
 
 interface LessonProgress {
   [lessonId: string]: boolean;
@@ -12,52 +12,77 @@ interface CourseProgress {
 interface ProgressState {
   progress: CourseProgress;
   currentLesson: Record<string, string>;
-  markComplete: (courseId: string, lessonId: string) => void;
+  fetchProgress: () => Promise<void>;
+  markComplete: (courseId: string, lessonId: string) => Promise<void>;
   isCompleted: (courseId: string, lessonId: string) => boolean;
   getCourseProgress: (courseId: string, totalLessons: number) => number;
   setCurrentLesson: (courseId: string, lessonId: string) => void;
   getCurrentLesson: (courseId: string) => string | null;
 }
 
-export const useProgressStore = create<ProgressState>()(
-  persist(
-    (set, get) => ({
-      progress: {},
-      currentLesson: {},
+export const useProgressStore = create<ProgressState>()((set, get) => ({
+  progress: {},
+  currentLesson: {},
 
-      markComplete: (courseId: string, lessonId: string) => {
-        set(state => ({
-          progress: {
-            ...state.progress,
-            [courseId]: {
-              ...state.progress[courseId],
-              [lessonId]: true,
-            },
-          },
-        }));
-      },
+  fetchProgress: async () => {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) return;
+    
+    const { data } = await supabase.from('progress').select('lesson_id, completed, lessons!inner(section_id, course_sections!inner(course_id))').eq('user_id', session.user.id);
+    
+    if (data) {
+      const newProgress: CourseProgress = {};
+      data.forEach((p: any) => {
+        const courseId = p.lessons?.course_sections?.course_id;
+        const lessonId = p.lesson_id;
+        if (courseId && lessonId && p.completed) {
+          if (!newProgress[courseId]) newProgress[courseId] = {};
+          newProgress[courseId][lessonId] = true;
+        }
+      });
+      set({ progress: newProgress });
+    }
+  },
 
-      isCompleted: (courseId: string, lessonId: string) => {
-        return !!get().progress[courseId]?.[lessonId];
+  markComplete: async (courseId: string, lessonId: string) => {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) return;
+    
+    set(state => ({
+      progress: {
+        ...state.progress,
+        [courseId]: {
+          ...state.progress[courseId],
+          [lessonId]: true,
+        },
       },
+    }));
 
-      getCourseProgress: (courseId: string, totalLessons: number) => {
-        const courseProgress = get().progress[courseId] || {};
-        const completed = Object.values(courseProgress).filter(Boolean).length;
-        if (totalLessons === 0) return 0;
-        return Math.round((completed / totalLessons) * 100);
-      },
+    await supabase.from('progress').upsert({
+      user_id: session.user.id,
+      lesson_id: lessonId,
+      completed: true
+    }, { onConflict: 'user_id, lesson_id' });
+  },
 
-      setCurrentLesson: (courseId: string, lessonId: string) => {
-        set(state => ({
-          currentLesson: { ...state.currentLesson, [courseId]: lessonId },
-        }));
-      },
+  isCompleted: (courseId: string, lessonId: string) => {
+    return !!get().progress[courseId]?.[lessonId];
+  },
 
-      getCurrentLesson: (courseId: string) => {
-        return get().currentLesson[courseId] || null;
-      },
-    }),
-    { name: 'ayurvidya_progress' }
-  )
-);
+  getCourseProgress: (courseId: string, totalLessons: number) => {
+    const courseProgress = get().progress[courseId] || {};
+    const completed = Object.values(courseProgress).filter(Boolean).length;
+    if (totalLessons === 0) return 0;
+    return Math.round((completed / totalLessons) * 100);
+  },
+
+  setCurrentLesson: (courseId: string, lessonId: string) => {
+    set(state => ({
+      currentLesson: { ...state.currentLesson, [courseId]: lessonId },
+    }));
+  },
+
+  getCurrentLesson: (courseId: string) => {
+    return get().currentLesson[courseId] || null;
+  },
+}));
