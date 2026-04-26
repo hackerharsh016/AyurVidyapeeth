@@ -51,13 +51,13 @@ export default function AuthModal({ open, mode, onClose, onSwitchMode }: Props) 
       return;
     }
     setLoading(true);
-    const success = await signup(signupForm);
+    const result = await signup(signupForm);
     setLoading(false);
-    if (success) {
+    if (result.success) {
       onClose();
       navigate('/');
     } else {
-      setError('Registration failed. Please try again.');
+      setError(result.error || 'Registration failed. Please try again.');
     }
   };
 
@@ -113,18 +113,6 @@ export default function AuthModal({ open, mode, onClose, onSwitchMode }: Props) 
               >
                 <Box component="form" onSubmit={handleLogin} sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
                   {error && <Alert severity="info" sx={{ borderRadius: 2, fontSize: '0.8rem' }}>{error}</Alert>}
-
-                  <Box sx={{ p: 2, bgcolor: '#F0FDF4', borderRadius: 2, border: '1px solid #BBF7D0' }}>
-                    <Typography variant="caption" sx={{ color: '#065F46', fontWeight: 600, display: 'block', mb: 0.5 }}>
-                      Demo Accounts:
-                    </Typography>
-                    <Typography variant="caption" sx={{ color: '#065F46', display: 'block' }}>
-                      student@ayurvidyapeeth.com (any password)
-                    </Typography>
-                    <Typography variant="caption" sx={{ color: '#065F46', display: 'block' }}>
-                      creator@ayurvidyapeeth.com | admin@ayurvidyapeeth.com
-                    </Typography>
-                  </Box>
 
                   <TextField
                     label="Email address"

@@ -16,7 +16,7 @@ interface AuthState {
   user: AuthUser | null;
   isAuthenticated: boolean;
   login: (email: string, password: string) => Promise<boolean>;
-  signup: (data: { name: string; email: string; college: string; year: string; password: string }) => Promise<boolean>;
+  signup: (data: { name: string; email: string; college: string; year: string; password: string }) => Promise<{ success: boolean; error?: string }>;
   logout: () => Promise<void>;
   updateProfile: (data: Partial<AuthUser>) => Promise<void>;
   initializeSession: () => Promise<void>;
@@ -69,10 +69,16 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
       }
     });
 
-    if (error || !authData.user) return false;
+    if (error) return { success: false, error: error.message };
+    if (!authData.user) return { success: false, error: 'Registration failed unexpectedly.' };
+    
+    // Check if email confirmation is required
+    if (!authData.session) {
+      return { success: false, error: 'Registration successful! Please check your email inbox to confirm your account.' };
+    }
     
     await get().initializeSession();
-    return true;
+    return { success: true };
   },
 
   logout: async () => {
