@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Box from '@mui/material/Box';
 import Container from '@mui/material/Container';
 import Typography from '@mui/material/Typography';
@@ -32,21 +32,17 @@ import PageLayout from '../../components/PageLayout';
 import { useCourseStore } from '../../stores/courseStore';
 import { useAuthStore } from '../../stores/authStore';
 import { useNavigate } from 'react-router-dom';
+import { supabase } from '../../supabase/supabase';
 
-const mockUsers = [
-  { id: 'u1', name: 'Arjun Sharma', email: 'arjun@example.com', role: 'student', college: 'BHU', joined: '2024-11-01', courses: 3 },
-  { id: 'u2', name: 'Priya Patel', email: 'priya@example.com', role: 'student', college: 'GAU', joined: '2024-10-15', courses: 5 },
-  { id: 'u3', name: 'Dr. Rajesh Nair', email: 'rajesh@example.com', role: 'creator', college: 'AIIA', joined: '2024-09-01', courses: 2 },
-  { id: 'u4', name: 'Meena Singh', email: 'meena@example.com', role: 'student', college: 'NIA Jaipur', joined: '2024-11-20', courses: 1 },
-  { id: 'u5', name: 'Dr. Anita Gupta', email: 'anita@example.com', role: 'creator', college: 'BHU', joined: '2024-08-15', courses: 3 },
-];
-
-const platformStats = [
-  { label: 'Total Users', value: '52,480', icon: '👥', change: '+8%' },
-  { label: 'Total Courses', value: '147', icon: '📚', change: '+12%' },
-  { label: 'Monthly Revenue', value: '₹4.2L', icon: '💰', change: '+18%' },
-  { label: 'Active Learners', value: '28,940', icon: '🎓', change: '+6%' },
-];
+interface AdminUser {
+  id: string;
+  name: string;
+  email: string;
+  role: string;
+  college: string;
+  joined: string;
+  courses: number;
+}
 
 export default function AdminPanel() {
   const navigate = useNavigate();
@@ -55,6 +51,75 @@ export default function AdminPanel() {
   const [tab, setTab] = useState(0);
   const [selectedCourse, setSelectedCourse] = useState<typeof courses[0] | null>(null);
   const [toast, setToast] = useState({ open: false, message: '', severity: 'success' as 'success' | 'info' });
+  
+  const [platformStats, setPlatformStats] = useState([
+    { label: 'Total Users', value: '0', icon: '👥', change: '-' },
+    { label: 'Total Courses', value: '0', icon: '📚', change: '-' },
+    { label: 'Total Revenue', value: '₹0', icon: '💰', change: '-' },
+    { label: 'Active Learners', value: '0', icon: '🎓', change: '-' },
+  ]);
+  const [adminUsers, setAdminUsers] = useState<AdminUser[]>([]);
+
+  useEffect(() => {
+    if (isAuthenticated && user?.role === 'admin') {
+      const fetchStats = async () => {
+        const { count: usersCount } = await supabase.from('profiles').select('*', { count: 'exact', head: true });
+        const { count: coursesCount } = await supabase.from('courses').select('*', { count: 'exact', head: true });
+        const { count: studentsCount } = await supabase.from('profiles').select('*', { count: 'exact', head: true }).eq('role', 'student');
+        
+        const { data: enrollments } = await supabase.from('enrollments').select('courses(price)');
+        let revenue = 0;
+        if (enrollments) {
+          // @ts-ignore - Supabase type inference gets a bit confused with joined pricing depending on schema
+          revenue = enrollments.reduce((acc, curr) => acc + (Number(curr.courses?.price) || 0), 0);
+        }
+
+        const formatCurrency = (amount: number) => {
+          if (amount >= 100000) return `₹${(amount / 100000).toFixed(1)}L`;
+          if (amount >= 1000) return `₹${(amount / 1000).toFixed(1)}k`;
+          return `₹${amount}`;
+        };
+
+        setPlatformStats([
+          { label: 'Total Users', value: (usersCount || 0).toLocaleString(), icon: '👥', change: 'Live Database' },
+          { label: 'Total Courses', value: (coursesCount || 0).toLocaleString(), icon: '📚', change: 'Live Database' },
+          { label: 'Total Revenue', value: formatCurrency(revenue), icon: '💰', change: 'Live Database' },
+          { label: 'Active Learners', value: (studentsCount || 0).toLocaleString(), icon: '🎓', change: 'Live Database' },
+        ]);
+      };
+      
+      const fetchUsers = async () => {
+        const { data: profiles } = await supabase.from('profiles').select('*').order('created_at', { ascending: false });
+        if (!profiles) return;
+        
+        const { data: enrollments } = await supabase.from('enrollments').select('user_id');
+        const { data: ownedCourses } = await supabase.from('courses').select('creator_id');
+        
+        const mapped = profiles.map(p => {
+          let courseCount = 0;
+          if (p.role === 'creator') {
+              courseCount = ownedCourses?.filter(c => c.creator_id === p.id).length || 0;
+          } else {
+              courseCount = enrollments?.filter(e => e.user_id === p.id).length || 0;
+          }
+          
+          return {
+            id: p.id,
+            name: p.full_name || 'Unknown User',
+            email: p.email || 'No email',
+            role: p.role || 'student',
+            college: p.college || 'N/A',
+            joined: p.created_at || new Date().toISOString(),
+            courses: courseCount
+          };
+        });
+        setAdminUsers(mapped);
+      };
+
+      fetchStats();
+      fetchUsers();
+    }
+  }, [isAuthenticated, user]);
 
   if (!isAuthenticated || user?.role !== 'admin') {
     return (
@@ -140,7 +205,7 @@ export default function AdminPanel() {
           onChange={(_e, v) => setTab(v)}
           sx={{ mb: 4, borderBottom: '1px solid', borderColor: 'divider' }}
         >
-          <Tab label={`Users (${mockUsers.length})`} />
+          <Tab label={`Users (${adminUsers.length})`} />
           <Tab label={`Courses (${courses.length})`} />
           <Tab label={`Approvals (${pendingCourses.length})`} />
         </Tabs>
@@ -150,7 +215,7 @@ export default function AdminPanel() {
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
               <Typography variant="h6" fontWeight={700}>Platform Users</Typography>
-              <Chip label={`${mockUsers.length} registered`} sx={{ bgcolor: '#D1FAE5', color: '#065F46' }} />
+              <Chip label={`${adminUsers.length} registered`} sx={{ bgcolor: '#D1FAE5', color: '#065F46' }} />
             </Box>
             <TableContainer component={Paper} sx={{ borderRadius: 3, border: '1px solid', borderColor: 'divider' }}>
               <Table>
@@ -165,7 +230,7 @@ export default function AdminPanel() {
                   </TableRow>
                 </TableHead>
                 <TableBody>
-                  {mockUsers.map(u => (
+                  {adminUsers.map(u => (
                     <TableRow key={u.id} sx={{ '&:hover': { bgcolor: 'rgba(14,91,68,0.02)' } }}>
                       <TableCell>
                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>

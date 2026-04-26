@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { supabase } from '../supabase/supabase';
 import type { Course } from '../data/courses';
+import { courses as mockCourses } from '../data/courses';
 
 interface EnrolledCourse {
   courseId: string;
@@ -31,17 +32,32 @@ export const useCourseStore = create<CourseState>()((set, get) => ({
   fetchCourses: async () => {
     const { data: dbCourses } = await supabase.from('courses').select('*, profiles(full_name, avatar_url)');
     if (dbCourses) {
-      const mapped = dbCourses.map((c: any) => ({
-        ...c,
-        instructor: c.profiles?.full_name || 'Instructor',
-        instructorAvatar: c.profiles?.avatar_url || '',
-        price: c.price || 0,
-        originalPrice: c.price ? c.price * 2 : 0,
-        thumbnail: c.thumbnail_url || 'https://images.unsplash.com/photo-1544367567-0f2fcb009e0b?auto=format&fit=crop&w=400&q=80',
-        rating: c.rating || 4.5,
-        students: c.students_count || 120,
-        status: c.status
-      })) as Course[];
+      const mapped = dbCourses.map((c: any) => {
+        const mockMatch = mockCourses.find(mock => mock.title === c.title) || mockCourses[0];
+        return {
+          ...c,
+          instructor: c.profiles?.full_name || 'Instructor',
+          instructorAvatar: c.profiles?.avatar_url || '',
+          price: c.price || 0,
+          originalPrice: c.price ? c.price * 2 : 0,
+          thumbnail: c.thumbnail_url || 'https://images.unsplash.com/photo-1544367567-0f2fcb009e0b?auto=format&fit=crop&w=400&q=80',
+          rating: c.rating || mockMatch.rating || 4.5,
+          students: c.students_count || mockMatch.students || 120,
+          status: c.status,
+          whatYouLearn: c.what_you_learn?.length ? c.what_you_learn : mockMatch.whatYouLearn || [],
+          curriculum: mockMatch.curriculum || [],
+          reviews: mockMatch.reviews || [],
+          tags: mockMatch.tags || [],
+          totalLessons: c.total_lessons ?? mockMatch.totalLessons ?? 0,
+          totalPdfs: mockMatch.totalPdfs ?? 0,
+          duration: mockMatch.duration ?? '0 hrs',
+          certificate: mockMatch.certificate ?? false,
+          language: c.language ?? mockMatch.language ?? 'English',
+          level: c.level ?? mockMatch.level ?? 'Beginner',
+          subject: c.subject ?? c.category ?? mockMatch.subject ?? 'Ayurveda',
+          free: Number(c.price) === 0,
+        };
+      }) as Course[];
       set({ courses: mapped });
     }
   },
@@ -127,8 +143,12 @@ export const useCourseStore = create<CourseState>()((set, get) => ({
       subtitle: course.subtitle,
       description: course.description,
       category: course.category,
+      subject: course.subject,
       level: course.level,
       price: course.price,
+      language: course.language,
+      what_you_learn: course.whatYouLearn,
+      total_lessons: course.totalLessons,
       status: 'pending' // new courses go to pending
     });
     
