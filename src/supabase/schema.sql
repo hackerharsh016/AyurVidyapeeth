@@ -108,14 +108,24 @@ alter table wishlists enable row level security;
 -- Add initial policies for RLS
 create policy "Public profiles are viewable by everyone" on profiles for select using (true);
 create policy "Users can update own profile" on profiles for update using (auth.uid() = id);
+create policy "Admins can update any profile" on profiles for update using (
+  exists (select 1 from profiles where id = auth.uid() and role = 'admin')
+);
 
 create policy "Published courses are viewable by everyone" on courses for select using (status = 'published');
 create policy "Creators can see their own courses" on courses for select using (auth.uid() = creator_id);
+create policy "Admins can see all courses" on courses for select using (
+  exists (select 1 from profiles where id = auth.uid() and role = 'admin')
+);
 create policy "Creators can insert/update their own courses" on courses for insert with check (auth.uid() = creator_id);
 create policy "Creators can update their own courses" on courses for update using (auth.uid() = creator_id);
+create policy "Admins can update any course" on courses for update using (
+  exists (select 1 from profiles where id = auth.uid() and role = 'admin')
+);
 
 create policy "Sections of viewable courses are viewable" on course_sections for select using (
   exists (select 1 from courses where courses.id = course_sections.course_id and (status = 'published' or creator_id = auth.uid()))
+  or exists (select 1 from profiles where id = auth.uid() and role = 'admin')
 );
 
 create policy "Lessons of viewable sections are viewable" on lessons for select using (
@@ -124,11 +134,15 @@ create policy "Lessons of viewable sections are viewable" on lessons for select 
     join courses on courses.id = course_sections.course_id
     where course_sections.id = lessons.section_id and (courses.status = 'published' or courses.creator_id = auth.uid())
   )
+  or exists (select 1 from profiles where id = auth.uid() and role = 'admin')
 );
 
 create policy "Directory is viewable by everyone" on directory_entries for select using (true);
 
 create policy "Users can view own enrollments" on enrollments for select using (auth.uid() = user_id);
+create policy "Admins can view all enrollments" on enrollments for select using (
+  exists (select 1 from profiles where id = auth.uid() and role = 'admin')
+);
 create policy "Users can enroll themselves" on enrollments for insert with check (auth.uid() = user_id);
 
 create policy "Users can view own progress" on progress for select using (auth.uid() = user_id);
