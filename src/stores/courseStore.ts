@@ -43,31 +43,77 @@ export const useCourseStore = create<CourseState>()((set, get) => ({
   testimonials: [],
 
   fetchCourses: async () => {
-    const { data: dbCourses } = await supabase.from('courses').select('*, profiles(full_name, avatar_url)');
+    const { data: dbCourses } = await supabase
+      .from('courses')
+      .select('*, profiles(full_name, avatar_url), course_sections(*, lessons(*)), reviews(*, profiles(full_name, avatar_url))');
+    
     if (dbCourses) {
       const mapped = dbCourses.map((c: any) => {
         const mockMatch = mockCourses.find(mock => mock.title === c.title) || mockCourses[0];
+        
+        // Calculate curriculum and total stats from DB
+        const curriculum = (c.course_sections || []).map((s: any) => ({
+          id: s.id,
+          title: s.title,
+          lessons: (s.lessons || []).map((l: any) => ({
+            id: l.id,
+            title: l.title,
+            duration: l.duration ? `${Math.floor(l.duration / 60)}:${(l.duration % 60).toString().padStart(2, '0')}` : '0:00',
+            type: l.video_url ? 'video' : 'pdf',
+            preview: l.is_preview || false
+          })).sort((a: any, b: any) => (a.sort_order || 0) - (b.sort_order || 0))
+        })).sort((a: any, b: any) => (a.sort_order || 0) - (b.sort_order || 0));
+
+        const allLessons = curriculum.flatMap((s: any) => s.lessons);
+        const totalLessonsCount = allLessons.length;
+        
+        // Calculate total duration
+        let totalSeconds = 0;
+        (c.course_sections || []).forEach((s: any) => {
+          (s.lessons || []).forEach((l: any) => {
+            totalSeconds += (l.duration || 0);
+          });
+        });
+        const durationHrs = Math.floor(totalSeconds / 3600);
+        const durationMins = Math.floor((totalSeconds % 3600) / 60);
+        const durationStr = durationHrs > 0 ? `${durationHrs}h ${durationMins}m` : `${durationMins}m`;
+
+        // Map reviews from DB
+        const reviews = (c.reviews || []).map((r: any) => ({
+          id: r.id,
+          user: r.profiles?.full_name || 'Anonymous Student',
+          avatar: r.profiles?.full_name ? r.profiles.full_name.split(' ').map((n: string) => n[0]).join('').toUpperCase() : 'AS',
+          rating: r.rating || 5,
+          comment: r.comment || '',
+          date: new Date(r.created_at).toLocaleDateString()
+        }));
+
+        // Calculate actual rating from reviews if available
+        const avgRating = reviews.length > 0 
+          ? Number((reviews.reduce((sum: number, r: any) => sum + r.rating, 0) / reviews.length).toFixed(1))
+          : (c.rating || 0);
+
         return {
           ...c,
           instructor: c.profiles?.full_name || 'Instructor',
-          instructorAvatar: c.profiles?.avatar_url || '',
-          price: c.price || 0,
-          originalPrice: c.price ? c.price * 2 : 0,
+          instructorAvatar: c.profiles?.full_name ? c.profiles.full_name.split(' ').map((n: string) => n[0]).join('').toUpperCase() : 'I',
+          price: Number(c.price) || 0,
+          originalPrice: c.price ? Number(c.price) * 1.5 : 0, 
           thumbnail: c.thumbnail_url || 'https://images.unsplash.com/photo-1544367567-0f2fcb009e0b?auto=format&fit=crop&w=400&q=80',
-          rating: c.rating || mockMatch.rating || 4.5,
-          students: c.students_count || mockMatch.students || 120,
+          rating: avgRating,
+          students: c.students_count || reviews.length, 
           status: c.status,
-          whatYouLearn: c.what_you_learn?.length ? c.what_you_learn : mockMatch.whatYouLearn || [],
-          curriculum: mockMatch.curriculum || [],
-          reviews: mockMatch.reviews || [],
+          whatYouLearn: c.what_you_learn?.length ? c.what_you_learn : [],
+          curriculum: curriculum,
+          reviews: reviews,
           tags: mockMatch.tags || [],
-          totalLessons: c.total_lessons ?? mockMatch.totalLessons ?? 0,
-          totalPdfs: mockMatch.totalPdfs ?? 0,
-          duration: mockMatch.duration ?? '0 hrs',
-          certificate: mockMatch.certificate ?? false,
-          language: c.language ?? mockMatch.language ?? 'English',
-          level: c.level ?? mockMatch.level ?? 'Beginner',
-          subject: c.subject ?? c.category ?? mockMatch.subject ?? 'Ayurveda',
+          totalLessons: totalLessonsCount,
+          totalPdfs: allLessons.filter((l: any) => l.type === 'pdf').length,
+          duration: durationStr,
+          certificate: c.level === 'Advanced' || false,
+          language: c.language ?? 'English',
+          level: c.level ?? 'Beginner',
+          subject: c.subject ?? c.category ?? 'Ayurveda',
           free: Number(c.price) === 0,
           creatorId: c.creator_id,
         };
