@@ -16,7 +16,14 @@ interface AuthState {
   user: AuthUser | null;
   isAuthenticated: boolean;
   login: (email: string, password: string) => Promise<boolean>;
-  signup: (data: { name: string; email: string; college: string; year: string; password: string }) => Promise<{ success: boolean; error?: string }>;
+  signup: (data: { 
+    name: string; 
+    email: string; 
+    college?: string; 
+    year?: string; 
+    role: 'student' | 'creator';
+    password: string 
+  }) => Promise<{ success: boolean; error?: string }>;
   logout: () => Promise<void>;
   updateProfile: (data: Partial<AuthUser>) => Promise<void>;
   initializeSession: () => Promise<void>;
@@ -65,6 +72,7 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
           full_name: data.name,
           college: data.college,
           year: data.year,
+          role: data.role,
         }
       }
     });

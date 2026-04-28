@@ -9,7 +9,11 @@ import Button from '@mui/material/Button';
 import IconButton from '@mui/material/IconButton';
 import Alert from '@mui/material/Alert';
 import Divider from '@mui/material/Divider';
+import ToggleButton from '@mui/material/ToggleButton';
+import ToggleButtonGroup from '@mui/material/ToggleButtonGroup';
 import CloseIcon from '@mui/icons-material/Close';
+import SchoolIcon from '@mui/icons-material/School';
+import PersonIcon from '@mui/icons-material/Person';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuthStore } from '../stores/authStore';
 
@@ -27,7 +31,16 @@ export default function AuthModal({ open, mode, onClose, onSwitchMode }: Props) 
   const [loading, setLoading] = useState(false);
 
   const [loginForm, setLoginForm] = useState({ email: '', password: '' });
-  const [signupForm, setSignupForm] = useState({ name: '', email: '', college: '', year: '', password: '' });
+  const [role, setRole] = useState<'student' | 'creator'>('student');
+  const [signupForm, setSignupForm] = useState({ 
+    name: '', 
+    email: '', 
+    college: '', 
+    year: '', 
+    password: '',
+    specialization: '',
+    institution: ''
+  });
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -46,12 +59,22 @@ export default function AuthModal({ open, mode, onClose, onSwitchMode }: Props) 
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+    
     if (!signupForm.name || !signupForm.email || !signupForm.password) {
       setError('Please fill in all required fields.');
       return;
     }
+
     setLoading(true);
-    const result = await signup(signupForm);
+    const result = await signup({
+      name: signupForm.name,
+      email: signupForm.email,
+      password: signupForm.password,
+      role: role,
+      college: role === 'student' ? signupForm.college : signupForm.institution,
+      year: role === 'student' ? signupForm.year : signupForm.specialization,
+    });
+    
     setLoading(false);
     if (result.success) {
       onClose();
@@ -154,12 +177,35 @@ export default function AuthModal({ open, mode, onClose, onSwitchMode }: Props) 
               >
                 <Box component="form" onSubmit={handleSignup} sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
                   {error && <Alert severity="error" sx={{ borderRadius: 2 }}>{error}</Alert>}
+                  
+                  <Box sx={{ mb: 1 }}>
+                    <Typography variant="caption" color="text.secondary" sx={{ mb: 1, display: 'block', fontWeight: 600 }}>
+                      I am a:
+                    </Typography>
+                    <ToggleButtonGroup
+                      value={role}
+                      exclusive
+                      onChange={(_, newRole) => newRole && setRole(newRole)}
+                      fullWidth
+                      size="small"
+                      color="primary"
+                    >
+                      <ToggleButton value="student" sx={{ py: 1, gap: 1 }}>
+                        <SchoolIcon fontSize="small" /> Student
+                      </ToggleButton>
+                      <ToggleButton value="creator" sx={{ py: 1, gap: 1 }}>
+                        <PersonIcon fontSize="small" /> Creator
+                      </ToggleButton>
+                    </ToggleButtonGroup>
+                  </Box>
+
                   <TextField
                     label="Full Name *"
                     value={signupForm.name}
                     onChange={e => setSignupForm(f => ({ ...f, name: e.target.value }))}
                     size="small"
                     fullWidth
+                    required
                   />
                   <TextField
                     label="Email Address *"
@@ -168,22 +214,47 @@ export default function AuthModal({ open, mode, onClose, onSwitchMode }: Props) 
                     onChange={e => setSignupForm(f => ({ ...f, email: e.target.value }))}
                     size="small"
                     fullWidth
+                    required
                   />
-                  <TextField
-                    label="College / Institution"
-                    value={signupForm.college}
-                    onChange={e => setSignupForm(f => ({ ...f, college: e.target.value }))}
-                    size="small"
-                    fullWidth
-                  />
-                  <TextField
-                    label="Year of Study"
-                    placeholder="e.g. 2nd Year BAMS"
-                    value={signupForm.year}
-                    onChange={e => setSignupForm(f => ({ ...f, year: e.target.value }))}
-                    size="small"
-                    fullWidth
-                  />
+                  
+                  {role === 'student' ? (
+                    <>
+                      <TextField
+                        label="College / Institution"
+                        value={signupForm.college}
+                        onChange={e => setSignupForm(f => ({ ...f, college: e.target.value }))}
+                        size="small"
+                        fullWidth
+                      />
+                      <TextField
+                        label="Year of Study"
+                        placeholder="e.g. 2nd Year BAMS"
+                        value={signupForm.year}
+                        onChange={e => setSignupForm(f => ({ ...f, year: e.target.value }))}
+                        size="small"
+                        fullWidth
+                      />
+                    </>
+                  ) : (
+                    <>
+                      <TextField
+                        label="Institution / Hospital"
+                        value={signupForm.institution}
+                        onChange={e => setSignupForm(f => ({ ...f, institution: e.target.value }))}
+                        size="small"
+                        fullWidth
+                      />
+                      <TextField
+                        label="Specialization / Title"
+                        placeholder="e.g. MD Kayachikitsa"
+                        value={signupForm.specialization}
+                        onChange={e => setSignupForm(f => ({ ...f, specialization: e.target.value }))}
+                        size="small"
+                        fullWidth
+                      />
+                    </>
+                  )}
+
                   <TextField
                     label="Password *"
                     type="password"
@@ -191,6 +262,7 @@ export default function AuthModal({ open, mode, onClose, onSwitchMode }: Props) 
                     onChange={e => setSignupForm(f => ({ ...f, password: e.target.value }))}
                     size="small"
                     fullWidth
+                    required
                   />
                   <Button
                     type="submit"
