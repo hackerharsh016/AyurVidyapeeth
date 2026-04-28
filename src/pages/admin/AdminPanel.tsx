@@ -8,8 +8,11 @@ import CardContent from '@mui/material/CardContent';
 import Button from '@mui/material/Button';
 import Chip from '@mui/material/Chip';
 import Avatar from '@mui/material/Avatar';
-import Tabs from '@mui/material/Tabs';
-import Tab from '@mui/material/Tab';
+import List from '@mui/material/List';
+import ListItem from '@mui/material/ListItem';
+import ListItemButton from '@mui/material/ListItemButton';
+import ListItemIcon from '@mui/material/ListItemIcon';
+import ListItemText from '@mui/material/ListItemText';
 import Table from '@mui/material/Table';
 import TableBody from '@mui/material/TableBody';
 import TableCell from '@mui/material/TableCell';
@@ -24,13 +27,21 @@ import DialogActions from '@mui/material/DialogActions';
 import Snackbar from '@mui/material/Snackbar';
 import Alert from '@mui/material/Alert';
 import CircularProgress from '@mui/material/CircularProgress';
+import Divider from '@mui/material/Divider';
+import IconButton from '@mui/material/IconButton';
+
+import HomeIcon from '@mui/icons-material/Home';
+import PersonIcon from '@mui/icons-material/Person';
+import SchoolIcon from '@mui/icons-material/School';
+import MenuBookIcon from '@mui/icons-material/MenuBook';
+import FactCheckIcon from '@mui/icons-material/FactCheck';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import CancelIcon from '@mui/icons-material/Cancel';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import AdminPanelSettingsIcon from '@mui/icons-material/AdminPanelSettings';
 import RefreshIcon from '@mui/icons-material/Refresh';
-import ErrorOutlineIcon from '@mui/icons-material/ErrorOutline';
-import { motion } from 'framer-motion';
+
+import { motion, AnimatePresence } from 'framer-motion';
 import PageLayout from '../../components/PageLayout';
 import { useCourseStore } from '../../stores/courseStore';
 import { useAuthStore } from '../../stores/authStore';
@@ -47,12 +58,28 @@ interface AdminUser {
   courses: number;
 }
 
+type AdminView = 'home' | 'students' | 'creators' | 'courses' | 'approvals';
+
+interface Profile {
+  id: string;
+  full_name: string | null;
+  email: string | null;
+  role: string | null;
+  college: string | null;
+  created_at: string | null;
+}
+
+interface EnrollmentWithCourse {
+  user_id: string | null;
+  courses: { price: number } | null;
+}
+
 export default function AdminPanel() {
   const navigate = useNavigate();
   const { user: currentUser, isAuthenticated } = useAuthStore();
   const { courses, updateCourseStatus } = useCourseStore();
-  const [tab, setTab] = useState(0);
-  const [selectedCourse, setSelectedCourse] = useState<typeof courses[0] | null>(null);
+  const [view, setView] = useState<AdminView>('home');
+  const [selectedCourse, setSelectedCourse] = useState<any | null>(null);
   const [loading, setLoading] = useState(true);
   const [debugInfo, setDebugInfo] = useState<string | null>(null);
   const [toast, setToast] = useState({ open: false, message: '', severity: 'success' as 'success' | 'info' | 'error' });
@@ -69,7 +96,6 @@ export default function AdminPanel() {
     setLoading(true);
     setDebugInfo(null);
     try {
-      // 1. Fetch All Profiles (Total Users)
       const { data: allProfiles, error: allError } = await supabase
         .from('profiles')
         .select('*')
@@ -77,37 +103,22 @@ export default function AdminPanel() {
 
       if (allError) throw allError;
 
-      // 2. Fetch Students specifically
-      const { data: studentProfiles, error: studentError } = await supabase
+      const { data: studentProfiles } = await supabase
         .from('profiles')
         .select('*')
-        .eq('role', 'student')
-        .order('created_at', { ascending: false });
+        .eq('role', 'student');
 
-      if (studentError) throw studentError;
-
-      // 3. Fetch Creators specifically
-      const { data: creatorProfiles, error: creatorError } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('role', 'creator')
-        .order('created_at', { ascending: false });
-
-      if (creatorError) throw creatorError;
-
-      // 4. Fetch Meta Data (Enrollments and Course Counts)
       const [enRes, crRes, coursesCountRes] = await Promise.all([
         supabase.from('enrollments').select('user_id, courses(price)'),
         supabase.from('courses').select('creator_id'),
         supabase.from('courses').select('*', { count: 'exact', head: true })
       ]);
 
-      const enrollments = enRes.data || [];
+      const enrollments = (enRes.data as unknown as EnrollmentWithCourse[]) || [];
       const ownedCourses = crRes.data || [];
       const totalCourses = coursesCountRes.count || 0;
 
-      // Stats Calculation
-      const revenue = enrollments.reduce((acc, curr: any) => acc + (Number(curr.courses?.price) || 0), 0);
+      const revenue = enrollments.reduce((acc: number, curr: EnrollmentWithCourse) => acc + (Number(curr.courses?.price) || 0), 0);
       const formatCurrency = (amount: number) => {
         if (amount >= 100000) return `₹${(amount / 100000).toFixed(1)}L`;
         if (amount >= 1000) return `₹${(amount / 1000).toFixed(1)}k`;
@@ -121,13 +132,12 @@ export default function AdminPanel() {
         { label: 'Active Learners', value: (studentProfiles?.length || 0).toLocaleString(), icon: '🎓', change: 'Live' },
       ]);
 
-      // Map combined data for the tables
-      const mapUser = (p: any) => {
+      const mapUser = (p: Profile) => {
         let count = 0;
         if (p.role === 'creator') {
-          count = ownedCourses.filter(c => c.creator_id === p.id).length;
+          count = ownedCourses.filter((c: { creator_id: string | null }) => c.creator_id === p.id).length;
         } else {
-          count = enrollments.filter(e => e.user_id === p.id).length;
+          count = enrollments.filter((e: EnrollmentWithCourse) => e.user_id === p.id).length;
         }
         return {
           id: p.id,
@@ -140,8 +150,7 @@ export default function AdminPanel() {
         };
       };
 
-      // Set state
-      setAdminUsers(allProfiles?.map(mapUser) || []);
+      setAdminUsers((allProfiles as Profile[])?.map(mapUser) || []);
       
       if (!allProfiles || allProfiles.length === 0) {
         setDebugInfo('Profiles table is empty. Ensure data exists in the "profiles" table.');
@@ -194,8 +203,16 @@ export default function AdminPanel() {
     setToast({ open: true, message: `❌ "${title}" rejected.`, severity: 'info' });
   };
 
+  const sidebarItems = [
+    { id: 'home', label: 'Dashboard', icon: <HomeIcon /> },
+    { id: 'students', label: 'Students', icon: <SchoolIcon /> },
+    { id: 'creators', label: 'Creators', icon: <PersonIcon /> },
+    { id: 'courses', label: 'All Courses', icon: <MenuBookIcon /> },
+    { id: 'approvals', label: 'Requests', icon: <FactCheckIcon />, badge: pendingCourses.length },
+  ];
+
   const UserTable = ({ users, type }: { users: AdminUser[], type: 'Student' | 'Creator' }) => (
-    <TableContainer component={Paper} sx={{ borderRadius: 3, border: '1px solid', borderColor: 'divider' }}>
+    <TableContainer component={Paper} elevation={0} sx={{ borderRadius: 3, border: '1px solid', borderColor: 'divider' }}>
       <Table>
         <TableHead>
           <TableRow sx={{ bgcolor: 'rgba(14,91,68,0.04)' }}>
@@ -213,7 +230,6 @@ export default function AdminPanel() {
                 <Box sx={{ opacity: 0.5 }}>
                   <Typography variant="h1" sx={{ mb: 1 }}>👥</Typography>
                   <Typography variant="h6">No {type.toLowerCase()}s found</Typography>
-                  <Typography variant="body2">If you expect data here, check your database connections.</Typography>
                 </Box>
               </TableCell>
             </TableRow>
@@ -267,279 +283,368 @@ export default function AdminPanel() {
 
   return (
     <PageLayout>
-      <Box sx={{ background: 'linear-gradient(135deg, #1A1A2E 0%, #16213E 100%)', py: { xs: 4, md: 6 } }}>
-        <Container maxWidth="lg">
-          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
-            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 3 }}>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                <AdminPanelSettingsIcon sx={{ color: '#D4A017', fontSize: 36 }} />
-                <Box>
-                  <Typography variant="h3" sx={{ color: 'white', fontWeight: 700, fontSize: { xs: '1.8rem', md: '2.4rem' } }}>
-                    Admin Panel
-                  </Typography>
-                  <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.6)' }}>AyurVidyapeeth Platform Management</Typography>
-                </Box>
-              </Box>
-              <Button 
-                startIcon={<RefreshIcon />} 
-                onClick={fetchData} 
-                sx={{ color: 'white', borderColor: 'rgba(255,255,255,0.2)' }} 
-                variant="outlined"
-              >
-                Refresh Data
-              </Button>
-            </Box>
-
-            {debugInfo && (
-              <Box sx={{ mb: 3, p: 2, bgcolor: 'rgba(239, 68, 68, 0.1)', border: '1px solid #EF4444', borderRadius: 2, display: 'flex', alignItems: 'center', gap: 2 }}>
-                <ErrorOutlineIcon sx={{ color: '#EF4444' }} />
-                <Typography variant="body2" sx={{ color: '#FCA5A5' }}>{debugInfo}</Typography>
-              </Box>
-            )}
-
-            <Grid container spacing={2}>
-              {platformStats.map((stat, i) => (
-                <Grid key={i} size={{ xs: 6, md: 3 }}>
-                  <Box sx={{ p: 2, bgcolor: 'rgba(255,255,255,0.08)', borderRadius: 3, border: '1px solid rgba(255,255,255,0.1)' }}>
-                    <Typography sx={{ fontSize: '1.5rem', mb: 0.5 }}>{stat.icon}</Typography>
-                    <Typography variant="h5" sx={{ color: 'white', fontWeight: 700, fontSize: { xs: '1.2rem', md: '1.5rem' } }}>
-                      {stat.value}
-                    </Typography>
-                    <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.5)', display: 'block' }}>{stat.label}</Typography>
-                    <Typography variant="caption" sx={{ color: '#86EFAC', fontWeight: 600 }}>{stat.change}</Typography>
-                  </Box>
-                </Grid>
-              ))}
-            </Grid>
-          </motion.div>
-        </Container>
-      </Box>
-
-      <Container maxWidth="lg" sx={{ py: { xs: 4, md: 6 } }}>
-        {pendingCourses.length > 0 && (
-          <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }}>
-            <Box sx={{ mb: 3, p: 2, bgcolor: '#FEF3C7', borderRadius: 2, border: '1px solid #FDE68A', display: 'flex', alignItems: 'center', gap: 2 }}>
-              <Typography sx={{ fontSize: '1.5rem' }}>⏳</Typography>
-              <Typography variant="body2" fontWeight={600} color="warning.dark">
-                {pendingCourses.length} course(s) awaiting your review and approval
-              </Typography>
-              <Button size="small" onClick={() => setTab(3)} sx={{ ml: 'auto', color: '#92400E' }}>
-                Review Now →
-              </Button>
-            </Box>
-          </motion.div>
-        )}
-
-        <Tabs
-          value={tab}
-          onChange={(_e, v) => setTab(v)}
-          sx={{ mb: 4, borderBottom: '1px solid', borderColor: 'divider' }}
+      <Box sx={{ display: 'flex', minHeight: 'calc(100vh - 64px)' }}>
+        {/* Sidebar */}
+        <Box
+          sx={{
+            width: { xs: 70, md: 240 },
+            flexShrink: 0,
+            borderRight: '1px solid',
+            borderColor: 'divider',
+            bgcolor: 'white',
+            display: 'flex',
+            flexDirection: 'column',
+            position: 'sticky',
+            top: 64,
+            height: 'calc(100vh - 64px)',
+            zIndex: 10,
+          }}
         >
-          <Tab label={`Students (${students.length})`} />
-          <Tab label={`Creators (${creators.length})`} />
-          <Tab label={`Courses (${courses.length})`} />
-          <Tab label={`Approvals (${pendingCourses.length})`} />
-        </Tabs>
-
-        {loading ? (
-          <Box sx={{ display: 'flex', justifyContent: 'center', py: 10 }}>
-            <CircularProgress />
+          <Box sx={{ p: 2, display: { xs: 'none', md: 'block' } }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 2 }}>
+              <AdminPanelSettingsIcon color="secondary" />
+              <Typography variant="subtitle1" fontWeight={700}>Admin Console</Typography>
+            </Box>
+            <Divider />
           </Box>
-        ) : (
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} key={tab}>
-            {/* Students Tab */}
-            {tab === 0 && (
-              <>
-                <Typography variant="h6" fontWeight={700} mb={3}>Registered Students</Typography>
-                <UserTable users={students} type="Student" />
-              </>
-            )}
+          
+          <List sx={{ px: 1 }}>
+            {sidebarItems.map((item) => (
+              <ListItem key={item.id} disablePadding sx={{ mb: 0.5 }}>
+                <ListItemButton
+                  selected={view === item.id}
+                  onClick={() => setView(item.id as AdminView)}
+                  sx={{
+                    borderRadius: 2,
+                    '&.Mui-selected': {
+                      bgcolor: 'rgba(14,91,68,0.08)',
+                      color: 'primary.main',
+                      '&:hover': { bgcolor: 'rgba(14,91,68,0.12)' },
+                      '& .MuiListItemIcon-root': { color: 'primary.main' }
+                    }
+                  }}
+                >
+                  <ListItemIcon sx={{ minWidth: { xs: 40, md: 40 } }}>{item.icon}</ListItemIcon>
+                  <ListItemText 
+                    primary={item.label} 
+                    sx={{ display: { xs: 'none', md: 'block' } }}
+                    primaryTypographyProps={{ fontWeight: view === item.id ? 700 : 500, variant: 'body2' }} 
+                  />
+                  {item.badge ? (
+                    <Box sx={{ 
+                      ml: 1, px: 0.8, py: 0.2, borderRadius: 10, 
+                      bgcolor: 'error.main', color: 'white', fontSize: '0.65rem', fontWeight: 700 
+                    }}>
+                      {item.badge}
+                    </Box>
+                  ) : null}
+                </ListItemButton>
+              </ListItem>
+            ))}
+          </List>
 
-            {/* Creators Tab */}
-            {tab === 1 && (
-              <>
-                <Typography variant="h6" fontWeight={700} mb={3}>Platform Creators</Typography>
-                <UserTable users={creators} type="Creator" />
-              </>
-            )}
+          <Box sx={{ mt: 'auto', p: 2, display: { xs: 'none', md: 'block' } }}>
+            <Button 
+              fullWidth 
+              startIcon={<RefreshIcon />} 
+              onClick={fetchData} 
+              variant="outlined" 
+              size="small"
+              sx={{ borderRadius: 2 }}
+            >
+              Refresh Data
+            </Button>
+          </Box>
+        </Box>
 
-            {/* Courses Tab */}
-            {tab === 2 && (
-              <>
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 3 }}>
-                  <Typography variant="h6" fontWeight={700}>All Courses</Typography>
-                  <Box sx={{ display: 'flex', gap: 1 }}>
-                    <Chip label={`${publishedCourses.length} Published`} sx={{ bgcolor: '#D1FAE5', color: '#065F46', fontWeight: 600 }} />
-                    <Chip label={`${pendingCourses.length} Pending`} sx={{ bgcolor: '#FEF3C7', color: '#92400E', fontWeight: 600 }} />
-                  </Box>
+        {/* Main Content */}
+        <Box sx={{ flexGrow: 1, bgcolor: '#F8FAFC', p: { xs: 2, md: 4 } }}>
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={view}
+              initial={{ opacity: 0, x: 10 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -10 }}
+              transition={{ duration: 0.2 }}
+            >
+              {loading ? (
+                <Box sx={{ display: 'flex', justifyContent: 'center', py: 20 }}>
+                  <CircularProgress />
                 </Box>
-                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                  {courses.length === 0 ? (
-                    <Card sx={{ p: 4, textAlign: 'center' }}>
-                      <Typography color="text.secondary">No courses found in database.</Typography>
-                    </Card>
-                  ) : (
-                    courses.map((course, i) => (
-                      <motion.div key={course.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.03 }}>
-                        <Card>
-                          <CardContent sx={{ display: 'flex', gap: 2, alignItems: 'center', flexWrap: 'wrap' }}>
-                            <Box sx={{ width: 48, height: 48, borderRadius: 2, bgcolor: 'primary.main', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.5rem', flexShrink: 0 }}>🌿</Box>
-                            <Box sx={{ flex: 1, minWidth: 150 }}>
-                              <Typography variant="subtitle2" fontWeight={700}>{course.title}</Typography>
-                              <Typography variant="caption" color="text.secondary">{course.instructor}</Typography>
-                              <Box sx={{ display: 'flex', gap: 1.5, mt: 0.5 }}>
-                                <Typography variant="caption" color="text.secondary">⭐ {course.rating}</Typography>
-                                <Typography variant="caption" color="text.secondary">👥 {course.students.toLocaleString()}</Typography>
-                                <Typography variant="caption" color="text.secondary">💰 {course.free ? 'Free' : `₹${course.price.toLocaleString()}`}</Typography>
+              ) : (
+                <Box>
+                  {/* Home View */}
+                  {view === 'home' && (
+                    <>
+                      <Box sx={{ mb: 4 }}>
+                        <Typography variant="h4" fontWeight={700} gutterBottom>Platform Overview</Typography>
+                        <Typography variant="body2" color="text.secondary">Real-time statistics and platform performance.</Typography>
+                      </Box>
+                      
+                      {debugInfo && (
+                        <Alert severity="warning" sx={{ mb: 3 }}>{debugInfo}</Alert>
+                      )}
+
+                      <Grid container spacing={3} sx={{ mb: 4 }}>
+                        {platformStats.map((stat, i) => (
+                          <Grid key={i} size={{ xs: 12, sm: 6, lg: 3 }}>
+                            <Card elevation={0} sx={{ borderRadius: 3, border: '1px solid', borderColor: 'divider' }}>
+                              <CardContent sx={{ p: 3 }}>
+                                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                                  <Box>
+                                    <Typography variant="caption" color="text.secondary" fontWeight={600} gutterBottom>{stat.label}</Typography>
+                                    <Typography variant="h4" fontWeight={800}>{stat.value}</Typography>
+                                  </Box>
+                                  <Box sx={{ p: 1.5, bgcolor: 'rgba(14,91,68,0.06)', borderRadius: 2, fontSize: '1.5rem' }}>
+                                    {stat.icon}
+                                  </Box>
+                                </Box>
+                                <Box sx={{ mt: 2, display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                                  <Chip label={stat.change} size="small" color="success" variant="outlined" sx={{ height: 20, fontSize: '0.65rem', fontWeight: 700 }} />
+                                  <Typography variant="caption" color="text.secondary">status</Typography>
+                                </Box>
+                              </CardContent>
+                            </Card>
+                          </Grid>
+                        ))}
+                      </Grid>
+
+                      <Grid container spacing={3}>
+                        <Grid size={{ xs: 12, md: 8 }}>
+                          <Card elevation={0} sx={{ borderRadius: 3, border: '1px solid', borderColor: 'divider', height: '100%' }}>
+                            <CardContent>
+                              <Typography variant="h6" fontWeight={700} mb={2}>Pending Approvals</Typography>
+                              {pendingCourses.length === 0 ? (
+                                <Box sx={{ py: 6, textAlign: 'center', opacity: 0.6 }}>
+                                  <FactCheckIcon sx={{ fontSize: 48, mb: 1, color: 'divider' }} />
+                                  <Typography variant="body2">All courses are up to date.</Typography>
+                                </Box>
+                              ) : (
+                                <List dense>
+                                  {pendingCourses.slice(0, 5).map((c) => (
+                                    <ListItem key={c.id} divider>
+                                      <ListItemText 
+                                        primary={c.title} 
+                                        secondary={`by ${c.instructor} • ${c.subject}`} 
+                                        primaryTypographyProps={{ fontWeight: 600 }}
+                                      />
+                                      <Button size="small" onClick={() => setView('approvals')}>Review</Button>
+                                    </ListItem>
+                                  ))}
+                                </List>
+                              )}
+                            </CardContent>
+                          </Card>
+                        </Grid>
+                        <Grid size={{ xs: 12, md: 4 }}>
+                          <Card elevation={0} sx={{ borderRadius: 3, border: '1px solid', borderColor: 'divider', height: '100%' }}>
+                            <CardContent>
+                              <Typography variant="h6" fontWeight={700} mb={2}>Platform Activity</Typography>
+                              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                                {[
+                                  { label: 'New Student Signup', time: '2 mins ago', icon: '👤' },
+                                  { label: 'Course Purchased', time: '15 mins ago', icon: '💰' },
+                                  { label: 'Course Submitted', time: '1 hour ago', icon: '📝' },
+                                ].map((act, i) => (
+                                  <Box key={i} sx={{ display: 'flex', gap: 1.5 }}>
+                                    <Box sx={{ fontSize: '1.2rem' }}>{act.icon}</Box>
+                                    <Box>
+                                      <Typography variant="body2" fontWeight={600}>{act.label}</Typography>
+                                      <Typography variant="caption" color="text.secondary">{act.time}</Typography>
+                                    </Box>
+                                  </Box>
+                                ))}
                               </Box>
-                            </Box>
-                            <Chip
-                              label={course.status}
-                              size="small"
-                              sx={{
-                                bgcolor: course.status === 'published' ? '#D1FAE5' : course.status === 'pending' ? '#FEF3C7' : 'grey.100',
-                                color: course.status === 'published' ? '#065F46' : course.status === 'pending' ? '#92400E' : 'text.secondary',
-                                fontWeight: 700,
-                                textTransform: 'capitalize',
-                              }}
-                            />
-                            <Box sx={{ display: 'flex', gap: 1 }}>
-                              <Button size="small" variant="outlined" onClick={() => navigate(`/courses/${course.id}`)}>View</Button>
-                              {course.status === 'pending' && (
-                                <Button size="small" variant="contained" color="primary" onClick={() => setSelectedCourse(course)}>
-                                  Review
-                                </Button>
-                              )}
-                              {course.status === 'published' && (
-                                <Button size="small" variant="outlined" color="error" onClick={() => handleReject(course.id, course.title)}>
-                                  Unpublish
-                                </Button>
-                              )}
-                            </Box>
-                          </CardContent>
-                        </Card>
-                      </motion.div>
-                    ))
+                            </CardContent>
+                          </Card>
+                        </Grid>
+                      </Grid>
+                    </>
+                  )}
+
+                  {/* Students View */}
+                  {view === 'students' && (
+                    <>
+                      <Box sx={{ mb: 4, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <Box>
+                          <Typography variant="h4" fontWeight={700} gutterBottom>Students</Typography>
+                          <Typography variant="body2" color="text.secondary">Manage all registered learners on the platform.</Typography>
+                        </Box>
+                      </Box>
+                      <UserTable users={students} type="Student" />
+                    </>
+                  )}
+
+                  {/* Creators View */}
+                  {view === 'creators' && (
+                    <>
+                      <Box sx={{ mb: 4, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <Box>
+                          <Typography variant="h4" fontWeight={700} gutterBottom>Creators</Typography>
+                          <Typography variant="body2" color="text.secondary">Manage educators and content contributors.</Typography>
+                        </Box>
+                      </Box>
+                      <UserTable users={creators} type="Creator" />
+                    </>
+                  )}
+
+                  {/* Courses View */}
+                  {view === 'courses' && (
+                    <>
+                      <Box sx={{ mb: 4, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                        <Box>
+                          <Typography variant="h4" fontWeight={700} gutterBottom>All Courses</Typography>
+                          <Typography variant="body2" color="text.secondary">Monitor and manage course inventory.</Typography>
+                        </Box>
+                        <Box sx={{ display: 'flex', gap: 1 }}>
+                          <Chip label={`${publishedCourses.length} Published`} color="success" size="small" />
+                          <Chip label={`${pendingCourses.length} Pending`} color="warning" size="small" />
+                        </Box>
+                      </Box>
+                      
+                      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                        {courses.map((course) => (
+                          <Card key={course.id} elevation={0} sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 3 }}>
+                            <CardContent sx={{ display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap' }}>
+                              <Box sx={{ width: 60, height: 60, borderRadius: 2, bgcolor: 'primary.main', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '2rem', flexShrink: 0 }}>
+                                🌿
+                              </Box>
+                              <Box sx={{ flex: 1, minWidth: 200 }}>
+                                <Typography variant="subtitle1" fontWeight={700}>{course.title}</Typography>
+                                <Typography variant="caption" color="text.secondary" display="block">by {course.instructor} • {course.subject}</Typography>
+                                <Box sx={{ mt: 1, display: 'flex', gap: 2 }}>
+                                  <Typography variant="caption" sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>⭐ {course.rating}</Typography>
+                                  <Typography variant="caption" sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>👥 {course.students}</Typography>
+                                  <Typography variant="caption" sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>💰 {course.free ? 'Free' : `₹${course.price}`}</Typography>
+                                </Box>
+                              </Box>
+                              <Chip 
+                                label={course.status} 
+                                color={course.status === 'published' ? 'success' : course.status === 'pending' ? 'warning' : 'default'}
+                                size="small"
+                                sx={{ fontWeight: 700, textTransform: 'capitalize' }}
+                              />
+                              <Box sx={{ display: 'flex', gap: 1 }}>
+                                <IconButton onClick={() => navigate(`/courses/${course.id}`)}><VisibilityIcon fontSize="small" /></IconButton>
+                                {course.status === 'pending' && (
+                                  <Button variant="contained" size="small" onClick={() => setSelectedCourse(course)}>Review</Button>
+                                )}
+                                {course.status === 'published' && (
+                                  <Button variant="outlined" color="error" size="small" onClick={() => handleReject(course.id, course.title)}>Unpublish</Button>
+                                )}
+                              </Box>
+                            </CardContent>
+                          </Card>
+                        ))}
+                      </Box>
+                    </>
+                  )}
+
+                  {/* Approvals View */}
+                  {view === 'approvals' && (
+                    <>
+                      <Box sx={{ mb: 4 }}>
+                        <Typography variant="h4" fontWeight={700} gutterBottom>Review Requests</Typography>
+                        <Typography variant="body2" color="text.secondary">Approve or reject newly submitted course content.</Typography>
+                      </Box>
+                      
+                      {pendingCourses.length === 0 ? (
+                        <Box sx={{ py: 10, textAlign: 'center', opacity: 0.5 }}>
+                          <CheckCircleIcon color="success" sx={{ fontSize: 64, mb: 2 }} />
+                          <Typography variant="h6">No pending requests!</Typography>
+                        </Box>
+                      ) : (
+                        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                          {pendingCourses.map((course) => (
+                            <Card key={course.id} elevation={0} sx={{ border: '2px solid', borderColor: 'warning.light', borderRadius: 4, overflow: 'hidden' }}>
+                              <Box sx={{ bgcolor: 'warning.light', px: 3, py: 1.5, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <Typography variant="caption" fontWeight={800} color="warning.dark" sx={{ textTransform: 'uppercase' }}>Awaiting Approval</Typography>
+                                <Typography variant="caption" color="text.secondary">Submitted: {new Date().toLocaleDateString()}</Typography>
+                              </Box>
+                              <CardContent sx={{ p: 3 }}>
+                                <Grid container spacing={3}>
+                                  <Grid size={{ xs: 12, md: 8 }}>
+                                    <Typography variant="h5" fontWeight={700} gutterBottom>{course.title}</Typography>
+                                    <Typography variant="body2" color="text.secondary" paragraph>{course.subtitle}</Typography>
+                                    
+                                    <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mb: 3 }}>
+                                      {[
+                                        { label: 'Category', val: course.subject },
+                                        { label: 'Level', val: course.level },
+                                        { label: 'Language', val: course.language },
+                                        { label: 'Lessons', val: course.totalLessons },
+                                      ].map(b => (
+                                        <Chip key={b.label} label={`${b.label}: ${b.val}`} size="small" variant="outlined" />
+                                      ))}
+                                    </Box>
+
+                                    <Typography variant="subtitle2" fontWeight={700} gutterBottom>Instructor Details</Typography>
+                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, p: 2, bgcolor: 'white', borderRadius: 2, border: '1px solid', borderColor: 'divider' }}>
+                                      <Avatar sx={{ bgcolor: 'secondary.main' }}>{course.instructor[0]}</Avatar>
+                                      <Box>
+                                        <Typography variant="body2" fontWeight={700}>{course.instructor}</Typography>
+                                        <Typography variant="caption" color="text.secondary">{course.instructorBio}</Typography>
+                                      </Box>
+                                    </Box>
+                                  </Grid>
+                                  <Grid size={{ xs: 12, md: 4 }}>
+                                    <Box sx={{ p: 3, bgcolor: 'white', borderRadius: 3, border: '1px solid', borderColor: 'divider', display: 'flex', flexDirection: 'column', gap: 2 }}>
+                                      <Typography variant="h6" fontWeight={700} textAlign="center" color="primary.main">
+                                        {course.free ? 'Free Course' : `₹${course.price}`}
+                                      </Typography>
+                                      <Divider />
+                                      <Button fullWidth variant="contained" color="success" startIcon={<CheckCircleIcon />} onClick={() => handleApprove(course.id, course.title)}>Approve & Publish</Button>
+                                      <Button fullWidth variant="outlined" color="error" startIcon={<CancelIcon />} onClick={() => handleReject(course.id, course.title)}>Reject Request</Button>
+                                      <Button fullWidth variant="outlined" startIcon={<VisibilityIcon />} onClick={() => setSelectedCourse(course)}>Details</Button>
+                                    </Box>
+                                  </Grid>
+                                </Grid>
+                              </CardContent>
+                            </Card>
+                          ))}
+                        </Box>
+                      )}
+                    </>
                   )}
                 </Box>
-              </>
-            )}
+              )}
+            </motion.div>
+          </AnimatePresence>
+        </Box>
+      </Box>
 
-            {/* Approvals Tab */}
-            {tab === 3 && (
-              <>
-                <Typography variant="h6" fontWeight={700} mb={3}>Pending Approvals ({pendingCourses.length})</Typography>
-                {pendingCourses.length === 0 ? (
-                  <Box sx={{ textAlign: 'center', py: 10 }}>
-                    <Typography sx={{ fontSize: '3rem', mb: 2 }}>✅</Typography>
-                    <Typography variant="h6" color="text.secondary">All caught up! No pending approvals.</Typography>
-                  </Box>
-                ) : (
-                  <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-                    {pendingCourses.map((course, i) => (
-                      <motion.div key={course.id} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.1 }}>
-                        <Card sx={{ border: '2px solid #FDE68A' }}>
-                          <CardContent sx={{ p: 3 }}>
-                            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 2, flexWrap: 'wrap', gap: 2 }}>
-                              <Box>
-                                <Chip label="⏳ Pending Review" sx={{ bgcolor: '#FEF3C7', color: '#92400E', fontWeight: 700, mb: 1 }} />
-                                <Typography variant="h6" fontWeight={700}>{course.title}</Typography>
-                                <Typography variant="body2" color="text.secondary">{course.subtitle}</Typography>
-                              </Box>
-                              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-                                <Button
-                                  startIcon={<CheckCircleIcon />}
-                                  variant="contained"
-                                  sx={{ bgcolor: '#16A34A', '&:hover': { bgcolor: '#15803D' } }}
-                                  onClick={() => handleApprove(course.id, course.title)}
-                                >
-                                  Approve & Publish
-                                </Button>
-                                <Button
-                                  startIcon={<CancelIcon />}
-                                  variant="outlined"
-                                  color="error"
-                                  onClick={() => handleReject(course.id, course.title)}
-                                >
-                                  Reject
-                                </Button>
-                                <Button
-                                  startIcon={<VisibilityIcon />}
-                                  variant="outlined"
-                                  onClick={() => setSelectedCourse(course)}
-                                >
-                                  Review Details
-                                </Button>
-                              </Box>
-                            </Box>
-
-                            <Grid container spacing={2}>
-                              {[
-                                { label: 'Instructor', value: course.instructor },
-                                { label: 'Subject', value: course.subject },
-                                { label: 'Level', value: course.level },
-                                { label: 'Price', value: course.free ? 'Free' : `₹${course.price.toLocaleString()}` },
-                                { label: 'Language', value: course.language },
-                                { label: 'Total Lessons', value: `${course.totalLessons} lessons` },
-                              ].map(item => (
-                                <Grid key={item.label} size={{ xs: 6, sm: 4 }}>
-                                  <Box sx={{ p: 1.5, bgcolor: 'rgba(14,91,68,0.04)', borderRadius: 2 }}>
-                                    <Typography variant="caption" color="text.secondary" display="block">{item.label}</Typography>
-                                    <Typography variant="body2" fontWeight={600}>{item.value}</Typography>
-                                  </Box>
-                                </Grid>
-                              ))}
-                            </Grid>
-                          </CardContent>
-                        </Card>
-                      </motion.div>
-                    ))}
-                  </Box>
-                )}
-              </>
-            )}
-          </motion.div>
-        )}
-      </Container>
-
-      {/* Course Detail Dialog */}
+      {/* Detail Dialog */}
       <Dialog
         open={Boolean(selectedCourse)}
         onClose={() => setSelectedCourse(null)}
         maxWidth="sm"
         fullWidth
-        PaperProps={{ sx: { borderRadius: 3 } }}
+        PaperProps={{ sx: { borderRadius: 4 } }}
       >
         {selectedCourse && (
           <>
-            <DialogTitle fontWeight={700}>{selectedCourse.title}</DialogTitle>
-            <DialogContent>
-              <Typography variant="body2" color="text.secondary" mb={2}>{selectedCourse.description}</Typography>
-              <Typography variant="subtitle2" fontWeight={700} mb={1}>What students will learn:</Typography>
-              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
-                {selectedCourse.whatYouLearn.slice(0, 4).map((item, i) => (
-                  <Typography key={i} variant="body2" color="text.secondary">• {item}</Typography>
-                ))}
+            <DialogTitle sx={{ fontWeight: 800 }}>Course Details Review</DialogTitle>
+            <DialogContent dividers>
+              <Box sx={{ mb: 3 }}>
+                <Typography variant="subtitle2" color="primary" fontWeight={700} gutterBottom>Description</Typography>
+                <Typography variant="body2">{selectedCourse.description}</Typography>
+              </Box>
+              <Box>
+                <Typography variant="subtitle2" color="primary" fontWeight={700} gutterBottom>Learning Outcomes</Typography>
+                <List dense>
+                  {selectedCourse.whatYouLearn.map((l: string, i: number) => (
+                    <ListItem key={i} disablePadding sx={{ py: 0.5 }}>
+                      <ListItemIcon sx={{ minWidth: 30 }}><CheckCircleIcon color="success" sx={{ fontSize: 16 }} /></ListItemIcon>
+                      <ListItemText primary={l} primaryTypographyProps={{ variant: 'body2' }} />
+                    </ListItem>
+                  ))}
+                </List>
               </Box>
             </DialogContent>
-            <DialogActions sx={{ px: 3, pb: 3, gap: 1 }}>
-              <Button onClick={() => setSelectedCourse(null)} color="inherit">Cancel</Button>
-              <Button
-                startIcon={<CancelIcon />}
-                color="error"
-                variant="outlined"
-                onClick={() => handleReject(selectedCourse.id, selectedCourse.title)}
-              >
-                Reject
-              </Button>
-              <Button
-                startIcon={<CheckCircleIcon />}
-                variant="contained"
-                sx={{ bgcolor: '#16A34A', '&:hover': { bgcolor: '#15803D' } }}
-                onClick={() => handleApprove(selectedCourse.id, selectedCourse.title)}
-              >
-                Approve & Publish
-              </Button>
+            <DialogActions sx={{ p: 3 }}>
+              <Button onClick={() => setSelectedCourse(null)}>Close</Button>
+              <Box sx={{ flex: 1 }} />
+              <Button variant="contained" color="success" onClick={() => handleApprove(selectedCourse.id, selectedCourse.title)}>Approve</Button>
             </DialogActions>
           </>
         )}
