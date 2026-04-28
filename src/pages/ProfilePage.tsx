@@ -23,9 +23,10 @@ import EditIcon from '@mui/icons-material/Edit';
 import SchoolIcon from '@mui/icons-material/School';
 import WorkspacePremiumIcon from '@mui/icons-material/WorkspacePremium';
 import FavoriteIcon from '@mui/icons-material/Favorite';
-import CreateIcon from '@mui/icons-material/Create';
 import LogoutIcon from '@mui/icons-material/Logout';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
+import DashboardIcon from '@mui/icons-material/Dashboard';
+import AdminPanelSettingsIcon from '@mui/icons-material/AdminPanelSettings';
 import { motion } from 'framer-motion';
 import PageLayout from '../components/PageLayout';
 import { useAuthStore, type AuthUser } from '../stores/authStore';
@@ -379,37 +380,33 @@ export default function ProfilePage() {
 
               {isOwnProfile && <Divider />}
 
-              {/* Become Creator */}
-              {isOwnProfile && profileUser.role === 'student' && (
-                <Box sx={{ mt: 3, p: 3, bgcolor: '#F0FDF4', borderRadius: 3, border: '1px solid #BBF7D0' }}>
-                  <Typography sx={{ fontSize: '2rem', mb: 1 }}>🎓</Typography>
-                  <Typography variant="subtitle1" fontWeight={700} color="primary.main" mb={1}>
-                    Share Your Knowledge
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary" mb={2}>
-                    Become an educator on AyurVidyapeeth and reach thousands of students.
-                  </Typography>
+              {/* Dashboard Access */}
+              {isOwnProfile && (profileUser.role === 'creator' || profileUser.role === 'admin') && (
+                <Box sx={{ mt: 3, display: 'flex', flexDirection: 'column', gap: 2 }}>
+                  <Typography variant="subtitle2" fontWeight={700} color="text.secondary">Quick Access</Typography>
+                  
+                  {profileUser.role === 'admin' && (
+                    <Button
+                      variant="contained"
+                      color="secondary"
+                      fullWidth
+                      startIcon={<AdminPanelSettingsIcon />}
+                      onClick={() => navigate('/admin')}
+                      sx={{ py: 1.2, borderRadius: 2, fontWeight: 700 }}
+                    >
+                      Admin Panel
+                    </Button>
+                  )}
+                  
                   <Button
                     variant="contained"
                     color="primary"
                     fullWidth
-                    startIcon={<CreateIcon />}
+                    startIcon={<DashboardIcon />}
                     onClick={() => navigate('/creator')}
+                    sx={{ py: 1.2, borderRadius: 2, fontWeight: 700 }}
                   >
-                    Become an Educator
-                  </Button>
-                </Box>
-              )}
-
-              {isOwnProfile && profileUser.role !== 'student' && (
-                <Box sx={{ mt: 3 }}>
-                  <Button
-                    variant="contained"
-                    color="primary"
-                    fullWidth
-                    onClick={() => navigate('/creator')}
-                  >
-                    Go to Creator Dashboard
+                    Creator Dashboard
                   </Button>
                 </Box>
               )}
