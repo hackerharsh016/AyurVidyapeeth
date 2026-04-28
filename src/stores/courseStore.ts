@@ -8,13 +8,25 @@ interface EnrolledCourse {
   enrolledAt: string;
 }
 
+export interface Testimonial {
+  id: string;
+  name: string;
+  college: string;
+  year: string;
+  quote: string;
+  rating: number;
+  avatar: string;
+}
+
 interface CourseState {
   enrolledCourses: EnrolledCourse[];
   wishlist: string[];
   courses: Course[];
+  testimonials: Testimonial[];
   fetchCourses: () => Promise<void>;
   fetchUserEnrollments: () => Promise<void>;
   fetchWishlist: () => Promise<void>;
+  fetchTestimonials: () => Promise<void>;
   enroll: (courseId: string) => Promise<void>;
   isEnrolled: (courseId: string) => boolean;
   toggleWishlist: (courseId: string) => Promise<void>;
@@ -28,6 +40,7 @@ export const useCourseStore = create<CourseState>()((set, get) => ({
   enrolledCourses: [],
   wishlist: [],
   courses: [],
+  testimonials: [],
 
   fetchCourses: async () => {
     const { data: dbCourses } = await supabase.from('courses').select('*, profiles(full_name, avatar_url)');
@@ -56,9 +69,31 @@ export const useCourseStore = create<CourseState>()((set, get) => ({
           level: c.level ?? mockMatch.level ?? 'Beginner',
           subject: c.subject ?? c.category ?? mockMatch.subject ?? 'Ayurveda',
           free: Number(c.price) === 0,
+          creatorId: c.creator_id,
         };
       }) as Course[];
       set({ courses: mapped });
+    }
+  },
+
+  fetchTestimonials: async () => {
+    const { data: dbReviews } = await supabase
+      .from('reviews')
+      .select('id, rating, comment, profiles(full_name, college, year, avatar_url)')
+      .order('rating', { ascending: false })
+      .limit(8);
+
+    if (dbReviews) {
+      const mapped: Testimonial[] = dbReviews.map((r: any) => ({
+        id: r.id,
+        name: r.profiles?.full_name || 'Anonymous Student',
+        college: r.profiles?.college || 'Ayurveda College',
+        year: r.profiles?.year || 'Student',
+        quote: r.comment || '',
+        rating: r.rating || 5,
+        avatar: r.profiles?.avatar_url || (r.profiles?.full_name ? r.profiles.full_name.split(' ').map((n: string) => n[0]).join('').toUpperCase() : 'AS')
+      }));
+      set({ testimonials: mapped });
     }
   },
 

@@ -1,3 +1,4 @@
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Box from '@mui/material/Box';
 import Container from '@mui/material/Container';
@@ -9,22 +10,94 @@ import Button from '@mui/material/Button';
 import Chip from '@mui/material/Chip';
 import Avatar from '@mui/material/Avatar';
 import LinearProgress from '@mui/material/LinearProgress';
+import CircularProgress from '@mui/material/CircularProgress';
 import { motion } from 'framer-motion';
 import PageLayout from '../../components/PageLayout';
 import { useAuthStore } from '../../stores/authStore';
 import { useCourseStore } from '../../stores/courseStore';
+import { supabase } from '../../supabase/supabase';
 
-const mockStats = {
-  totalRevenue: 128400,
-  totalStudents: 4234,
-  avgRating: 4.7,
-  totalViews: 89200,
-};
+interface CreatorStats {
+  totalRevenue: number;
+  totalStudents: number;
+  avgRating: number;
+  totalViews: number;
+}
 
 export default function CreatorDashboard() {
   const navigate = useNavigate();
   const { user, isAuthenticated } = useAuthStore();
-  const { courses } = useCourseStore();
+  const { courses, fetchCourses } = useCourseStore();
+  const [activeFilter, setActiveFilter] = useState<'all' | 'published' | 'pending' | 'draft'>('all');
+  const [stats, setStats] = useState<CreatorStats>({
+    totalRevenue: 0,
+    totalStudents: 0,
+    avgRating: 0,
+    totalViews: 0,
+  });
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (isAuthenticated && user) {
+      const fetchCreatorData = async () => {
+        setLoading(true);
+        try {
+          // 1. Get Creator's Courses
+          const { data: myCoursesData } = await supabase
+            .from('courses')
+            .select('id, rating, price, students_count')
+            .eq('creator_id', user.id);
+
+          const myCourseIds = myCoursesData?.map(c => c.id) || [];
+
+          if (myCourseIds.length > 0) {
+            // 2. Fetch Enrollments for revenue and unique students
+            const { data: enrollments } = await supabase
+              .from('enrollments')
+              .select('user_id, courses(price)')
+              .in('course_id', myCourseIds);
+
+            const totalRevenue = enrollments?.reduce((acc, curr: any) => acc + (Number(curr.courses?.price) || 0), 0) || 0;
+            const uniqueStudents = new Set(enrollments?.map(e => e.user_id)).size;
+
+            // 3. Calculate Average Rating from individual reviews
+            const { data: reviewsData } = await supabase
+              .from('reviews')
+              .select('rating')
+              .in('course_id', myCourseIds);
+
+            const totalReviews = reviewsData?.length || 0;
+            const sumRatings = reviewsData?.reduce((acc, curr) => acc + (curr.rating || 0), 0) || 0;
+            const avgRating = totalReviews > 0 ? sumRatings / totalReviews : 0;
+
+            // 4. Fetch Views (Lesson Progress entries as proxy)
+            const { count: progressCount } = await supabase
+              .from('progress')
+              .select('*', { count: 'exact', head: true })
+              .in('lesson_id', 
+                (await supabase.from('lessons').select('id').in('section_id', 
+                  (await supabase.from('course_sections').select('id').in('course_id', myCourseIds)).data?.map(s => s.id) || []
+                )).data?.map(l => l.id) || []
+              );
+
+            setStats({
+              totalRevenue,
+              totalStudents: uniqueStudents,
+              avgRating: Number(avgRating.toFixed(1)),
+              totalViews: progressCount || 0,
+            });
+          }
+        } catch (error) {
+          console.error('Error fetching creator stats:', error);
+        } finally {
+          setLoading(false);
+        }
+      };
+
+      fetchCreatorData();
+      fetchCourses(); // Ensure store is updated
+    }
+  }, [isAuthenticated, user, fetchCourses]);
 
   if (!isAuthenticated) {
     return (
@@ -37,15 +110,25 @@ export default function CreatorDashboard() {
     );
   }
 
-  const myCourses = courses.filter(c => c.creatorId === user?.id || user?.role === 'admin');
+  const myCourses = courses.filter(c => c.creatorId === user?.id || (user?.role === 'admin' && c.creatorId === user?.id));
   const publishedCount = myCourses.filter(c => c.status === 'published').length;
   const pendingCount = myCourses.filter(c => c.status === 'pending').length;
   const draftCount = myCourses.filter(c => c.status === 'draft').length;
+
+  const filteredCourses = activeFilter === 'all' 
+    ? myCourses 
+    : myCourses.filter(c => c.status === activeFilter);
 
   const statusColor = (s: string) => {
     if (s === 'published') return { bg: '#D1FAE5', color: '#065F46', label: '✓ Published' };
     if (s === 'pending') return { bg: '#FEF3C7', color: '#92400E', label: '⏳ Pending Review' };
     return { bg: 'grey.100', color: 'text.secondary', label: '📝 Draft' };
+  };
+
+  const formatCurrency = (amount: number) => {
+    if (amount >= 100000) return `₹${(amount / 100000).toFixed(1)}L`;
+    if (amount >= 1000) return `₹${(amount / 1000).toFixed(1)}k`;
+    return `₹${amount}`;
   };
 
   return (
@@ -60,7 +143,7 @@ export default function CreatorDashboard() {
                 </Typography>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
                   <Avatar sx={{ bgcolor: '#D4A017', width: 28, height: 28, fontSize: '0.7rem', fontWeight: 700 }}>
-                    {user?.avatar}
+                    {user?.avatar || (user?.name ? user.name[0] : 'U')}
                   </Avatar>
                   <Typography variant="body1" sx={{ color: 'rgba(255,255,255,0.8)' }}>
                     {user?.name} • {user?.college}
@@ -79,19 +162,25 @@ export default function CreatorDashboard() {
             {/* Stats Row */}
             <Grid container spacing={2} sx={{ mt: 3 }}>
               {[
-                { label: 'Total Revenue', value: `₹${mockStats.totalRevenue.toLocaleString()}`, icon: '💰', change: '+12%' },
-                { label: 'Total Students', value: mockStats.totalStudents.toLocaleString(), icon: '👥', change: '+8%' },
-                { label: 'Avg Rating', value: mockStats.avgRating.toString(), icon: '⭐', change: '+0.1' },
-                { label: 'Total Views', value: `${(mockStats.totalViews / 1000).toFixed(0)}K`, icon: '👁', change: '+15%' },
+                { label: 'Total Revenue', value: formatCurrency(stats.totalRevenue), icon: '💰', change: 'Live' },
+                { label: 'Total Students', value: stats.totalStudents.toLocaleString(), icon: '👥', change: 'Live' },
+                { label: 'Avg Rating', value: stats.avgRating === 0 ? 'N/A' : stats.avgRating.toString(), icon: '⭐', change: 'Live' },
+                { label: 'Total Views', value: stats.totalViews > 1000 ? `${(stats.totalViews / 1000).toFixed(1)}k` : stats.totalViews.toString(), icon: '👁', change: 'Live' },
               ].map((stat, i) => (
                 <Grid key={i} size={{ xs: 6, md: 3 }}>
                   <Box sx={{ p: 2, bgcolor: 'rgba(255,255,255,0.12)', backdropFilter: 'blur(10px)', borderRadius: 3, border: '1px solid rgba(255,255,255,0.15)' }}>
-                    <Typography sx={{ fontSize: '1.5rem', mb: 0.5 }}>{stat.icon}</Typography>
-                    <Typography variant="h5" sx={{ color: 'white', fontWeight: 700, fontSize: { xs: '1.2rem', md: '1.5rem' } }}>
-                      {stat.value}
-                    </Typography>
-                    <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.6)', display: 'block' }}>{stat.label}</Typography>
-                    <Typography variant="caption" sx={{ color: '#86EFAC', fontWeight: 600 }}>{stat.change} this month</Typography>
+                    {loading ? (
+                      <CircularProgress size={20} sx={{ color: 'white', mb: 1 }} />
+                    ) : (
+                      <>
+                        <Typography sx={{ fontSize: '1.5rem', mb: 0.5 }}>{stat.icon}</Typography>
+                        <Typography variant="h5" sx={{ color: 'white', fontWeight: 700, fontSize: { xs: '1.2rem', md: '1.5rem' } }}>
+                          {stat.value}
+                        </Typography>
+                        <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.6)', display: 'block' }}>{stat.label}</Typography>
+                        <Typography variant="caption" sx={{ color: '#86EFAC', fontWeight: 600 }}>{stat.change}</Typography>
+                      </>
+                    )}
                   </Box>
                 </Grid>
               ))}
@@ -104,16 +193,30 @@ export default function CreatorDashboard() {
         {/* Course Status Summary */}
         <Box sx={{ display: 'flex', gap: 2, mb: 4, flexWrap: 'wrap' }}>
           {[
-            { label: 'All Courses', value: myCourses.length, active: true },
-            { label: 'Published', value: publishedCount },
-            { label: 'Pending', value: pendingCount },
-            { label: 'Draft', value: draftCount },
-          ].map((item, i) => (
-            <Box key={i} sx={{ px: 3, py: 1.5, borderRadius: 2, bgcolor: item.active ? 'primary.main' : 'rgba(14,91,68,0.06)', cursor: 'pointer' }}>
-              <Typography variant="caption" sx={{ color: item.active ? 'rgba(255,255,255,0.8)' : 'text.secondary', display: 'block' }}>
+            { id: 'all', label: 'All Courses', value: myCourses.length },
+            { id: 'published', label: 'Published', value: publishedCount },
+            { id: 'pending', label: 'Pending', value: pendingCount },
+            { id: 'draft', label: 'Draft', value: draftCount },
+          ].map((item) => (
+            <Box 
+              key={item.id} 
+              onClick={() => setActiveFilter(item.id as any)}
+              sx={{ 
+                px: 3, 
+                py: 1.5, 
+                borderRadius: 2, 
+                bgcolor: activeFilter === item.id ? 'primary.main' : 'rgba(14,91,68,0.06)', 
+                cursor: 'pointer',
+                transition: 'all 0.2s ease',
+                '&:hover': {
+                  bgcolor: activeFilter === item.id ? 'primary.main' : 'rgba(14,91,68,0.1)'
+                }
+              }}
+            >
+              <Typography variant="caption" sx={{ color: activeFilter === item.id ? 'rgba(255,255,255,0.8)' : 'text.secondary', display: 'block' }}>
                 {item.label}
               </Typography>
-              <Typography variant="h6" fontWeight={700} sx={{ color: item.active ? 'white' : 'primary.main' }}>
+              <Typography variant="h6" fontWeight={700} sx={{ color: activeFilter === item.id ? 'white' : 'primary.main' }}>
                 {item.value}
               </Typography>
             </Box>
@@ -121,19 +224,23 @@ export default function CreatorDashboard() {
         </Box>
 
         {/* Course List */}
-        <Typography variant="h6" fontWeight={700} mb={3}>My Courses</Typography>
+        <Typography variant="h6" fontWeight={700} mb={3}>
+          {activeFilter === 'all' ? 'My Courses' : `${activeFilter.charAt(0).toUpperCase() + activeFilter.slice(1)} Courses`}
+        </Typography>
 
-        {myCourses.length === 0 ? (
+        {filteredCourses.length === 0 ? (
           <Box sx={{ textAlign: 'center', py: 10 }}>
             <Typography sx={{ fontSize: '3rem', mb: 2 }}>📹</Typography>
-            <Typography variant="h6" color="text.secondary">No courses created yet</Typography>
-            <Button variant="contained" color="primary" sx={{ mt: 3 }} onClick={() => navigate('/creator/upload')}>
-              Create Your First Course
-            </Button>
+            <Typography variant="h6" color="text.secondary">No {activeFilter !== 'all' ? activeFilter : ''} courses found</Typography>
+            {activeFilter === 'all' && (
+              <Button variant="contained" color="primary" sx={{ mt: 3 }} onClick={() => navigate('/creator/upload')}>
+                Create Your First Course
+              </Button>
+            )}
           </Box>
         ) : (
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-            {myCourses.map((course, i) => {
+            {filteredCourses.map((course, i) => {
               const sc = statusColor(course.status);
               return (
                 <motion.div key={course.id} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.08 }}>
@@ -194,7 +301,7 @@ export default function CreatorDashboard() {
           <Card sx={{ p: 3 }}>
             <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 3 }}>
               <Typography variant="subtitle2" color="text.secondary">Last 6 months</Typography>
-              <Chip label="This Month: ₹18,400" sx={{ bgcolor: '#D1FAE5', color: '#065F46', fontWeight: 600 }} />
+              <Chip label={`Total: ${formatCurrency(stats.totalRevenue)}`} sx={{ bgcolor: '#D1FAE5', color: '#065F46', fontWeight: 600 }} />
             </Box>
             <Box sx={{ display: 'flex', alignItems: 'flex-end', gap: 1, height: 120 }}>
               {[35, 55, 45, 70, 85, 100].map((h, i) => (
