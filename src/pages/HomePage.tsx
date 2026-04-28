@@ -250,7 +250,7 @@ export default function HomePage() {
                 <FadeInSection delay={i * 0.08}>
                   <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.98 }}>
                     <Card
-                      onClick={() => navigate(`/directory/${topic.slug}`)}
+                      onClick={() => navigate(`/topic/${topic.slug}`)}
                       sx={{
                         cursor: 'pointer',
                         textAlign: 'center',

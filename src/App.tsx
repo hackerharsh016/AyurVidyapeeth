@@ -16,6 +16,7 @@ import CourseDetailPage from './pages/courses/CourseDetailPage';
 import LearningPage from './pages/learning/LearningPage';
 import VideoPlayerPage from './pages/learning/VideoPlayerPage';
 import ProfilePage from './pages/ProfilePage';
+import TopicDetailPage from './pages/TopicDetailPage';
 import CreatorDashboard from './pages/creator/CreatorDashboard';
 import UploadCoursePage from './pages/creator/UploadCoursePage';
 import AdminPanel from './pages/admin/AdminPanel';
@@ -42,6 +43,7 @@ function AnimatedRoutes() {
           <Route path="/" element={<HomePage />} />
           <Route path="/directory" element={<DirectoryPage />} />
           <Route path="/directory/:slug" element={<DirectoryDetailPage />} />
+          <Route path="/topic/:slug" element={<TopicDetailPage />} />
           <Route path="/courses" element={<CoursesPage />} />
           <Route path="/courses/:id" element={<CourseDetailPage />} />
           <Route path="/learning" element={<LearningPage />} />
@@ -78,7 +80,7 @@ function App() {
     });
 
     return () => subscription.unsubscribe();
-  }, [initializeSession, fetchCourses, fetchUserEnrollments, fetchWishlist]);
+  }, [initializeSession, fetchCourses, fetchTestimonials, fetchUserEnrollments, fetchWishlist]);
 
   return (
     <ThemeProvider theme={theme}>
