@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Box from '@mui/material/Box';
 import Container from '@mui/material/Container';
@@ -14,8 +14,7 @@ import { motion, useInView } from 'framer-motion';
 import { useRef } from 'react';
 import PageLayout from '../components/PageLayout';
 import CourseCard from '../components/CourseCard';
-import { courses } from '../data/courses';
-import { testimonials } from '../data/users';
+import { useCourseStore } from '../stores/courseStore';
 
 const popularTopics = [
   { label: 'Pranavaha Srotas', slug: 'pranavaha-srotas', icon: '💨', desc: 'Respiratory channels' },
@@ -24,13 +23,6 @@ const popularTopics = [
   { label: 'Pitta Dosha', slug: 'pitta-dosha', icon: '🔥', desc: 'Metabolic force' },
   { label: 'Kapha Dosha', slug: 'kapha-dosha', icon: '🌊', desc: 'Structural force' },
   { label: 'Ashwagandha', slug: 'ashwagandha', icon: '🌿', desc: 'King of herbs' },
-];
-
-const stats = [
-  { value: '500+', label: 'Expert Courses' },
-  { value: '50,000+', label: 'Students' },
-  { value: '200+', label: 'Expert Educators' },
-  { value: '100%', label: 'BAMS Aligned' },
 ];
 
 function FadeInSection({ children, delay = 0 }: { children: React.ReactNode; delay?: number }) {
@@ -50,8 +42,17 @@ function FadeInSection({ children, delay = 0 }: { children: React.ReactNode; del
 
 export default function HomePage() {
   const navigate = useNavigate();
-  const [activeSlide] = useState(0);
-  const featuredCourses = courses.filter(c => c.status === 'published').slice(0, 6);
+  const { courses, testimonials } = useCourseStore();
+
+  const publishedCourses = useMemo(() => courses.filter(c => c.status === 'published'), [courses]);
+  const featuredCourses = useMemo(() => publishedCourses.slice(0, 6), [publishedCourses]);
+  
+  const stats = useMemo(() => [
+    { value: `${publishedCourses.length}+`, label: 'Expert Courses' },
+    { value: '50,000+', label: 'Students' },
+    { value: `${new Set(courses.map(c => c.creatorId)).size}+`, label: 'Expert Educators' },
+    { value: '100%', label: 'BAMS Aligned' },
+  ], [publishedCourses.length, courses]);
 
   return (
     <PageLayout>
@@ -318,7 +319,7 @@ export default function HomePage() {
         </Container>
       </Box>
 
-      {/* Testimonials */}
+      {/* Testimonials / Reviews Section */}
       <Box sx={{ py: { xs: 6, md: 10 }, bgcolor: '#F5E8C7' }}>
         <Container maxWidth="lg">
           <FadeInSection>
@@ -332,39 +333,54 @@ export default function HomePage() {
             </Box>
           </FadeInSection>
 
-          <Grid container spacing={3}>
-            {testimonials.map((t, i) => (
-              <Grid key={t.id} size={{ xs: 12, sm: 6, md: 3 }}>
-                <FadeInSection delay={i * 0.1}>
-                  <Card sx={{ height: '100%', p: 0.5 }}>
-                    <CardContent sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
-                      <Rating value={t.rating} readOnly size="small" sx={{ color: '#D4A017' }} />
-                      <Typography
-                        variant="body2"
-                        color="text.secondary"
-                        sx={{ fontStyle: 'italic', lineHeight: 1.6, flexGrow: 1 }}
-                      >
-                        "{t.quote}"
-                      </Typography>
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-                        <Avatar sx={{ bgcolor: 'primary.main', width: 36, height: 36, fontSize: '0.75rem', fontWeight: 700 }}>
-                          {t.avatar}
-                        </Avatar>
-                        <Box>
-                          <Typography variant="subtitle2" fontWeight={600} sx={{ lineHeight: 1.2 }}>
-                            {t.name}
-                          </Typography>
-                          <Typography variant="caption" color="text.secondary">
-                            {t.year} • {t.college.split(',')[0]}
-                          </Typography>
+          {testimonials.length > 0 ? (
+            <Grid container spacing={3}>
+              {testimonials.map((t, i) => (
+                <Grid key={t.id} size={{ xs: 12, sm: 6, md: 3 }}>
+                  <FadeInSection delay={i * 0.1}>
+                    <Card sx={{ height: '100%', p: 0.5 }}>
+                      <CardContent sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+                        <Rating value={t.rating} readOnly size="small" sx={{ color: '#D4A017' }} />
+                        <Typography
+                          variant="body2"
+                          color="text.secondary"
+                          sx={{ fontStyle: 'italic', lineHeight: 1.6, flexGrow: 1 }}
+                        >
+                          "{t.quote}"
+                        </Typography>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                          <Avatar 
+                            src={t.avatar?.startsWith('http') ? t.avatar : undefined}
+                            sx={{ bgcolor: 'primary.main', width: 36, height: 36, fontSize: '0.75rem', fontWeight: 700 }}
+                          >
+                            {!t.avatar?.startsWith('http') ? t.avatar : undefined}
+                          </Avatar>
+                          <Box>
+                            <Typography variant="subtitle2" fontWeight={600} sx={{ lineHeight: 1.2 }}>
+                              {t.name}
+                            </Typography>
+                            <Typography variant="caption" color="text.secondary">
+                              {t.year} • {t.college.split(',')[0]}
+                            </Typography>
+                          </Box>
                         </Box>
-                      </Box>
-                    </CardContent>
-                  </Card>
-                </FadeInSection>
-              </Grid>
-            ))}
-          </Grid>
+                      </CardContent>
+                    </Card>
+                  </FadeInSection>
+                </Grid>
+              ))}
+            </Grid>
+          ) : (
+            <Box sx={{ textAlign: 'center', py: 8, opacity: 0.6 }}>
+              <Typography sx={{ fontSize: '3rem', mb: 2 }}>✍️</Typography>
+              <Typography variant="h6" color="text.secondary" fontWeight={500}>
+                No reviews found
+              </Typography>
+              <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+                Be the first to review one of our courses!
+              </Typography>
+            </Box>
+          )}
         </Container>
       </Box>
 
@@ -475,9 +491,6 @@ export default function HomePage() {
           </Box>
         </Container>
       </Box>
-
-      {/* Prevent unused variable warning */}
-      <Box sx={{ display: 'none' }}>{activeSlide}</Box>
     </PageLayout>
   );
 }

@@ -47,6 +47,7 @@ function AnimatedRoutes() {
           <Route path="/learning" element={<LearningPage />} />
           <Route path="/learning/:courseId" element={<VideoPlayerPage />} />
           <Route path="/profile" element={<ProfilePage />} />
+          <Route path="/profile/:id" element={<ProfilePage />} />
           <Route path="/creator" element={<CreatorDashboard />} />
           <Route path="/creator/upload" element={<UploadCoursePage />} />
           <Route path="/admin" element={<AdminPanel />} />
@@ -58,10 +59,11 @@ function AnimatedRoutes() {
 
 function App() {
   const { initializeSession } = useAuthStore();
-  const { fetchCourses, fetchUserEnrollments, fetchWishlist } = useCourseStore();
+  const { fetchCourses, fetchUserEnrollments, fetchWishlist, fetchTestimonials } = useCourseStore();
 
   useEffect(() => {
     fetchCourses();
+    fetchTestimonials();
     initializeSession().then(() => {
       fetchUserEnrollments();
       fetchWishlist();
