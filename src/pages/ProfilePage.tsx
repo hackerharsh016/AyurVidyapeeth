@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
 import Box from '@mui/material/Box';
 import Container from '@mui/material/Container';
 import Typography from '@mui/material/Typography';
@@ -18,35 +18,96 @@ import DialogContent from '@mui/material/DialogContent';
 import DialogActions from '@mui/material/DialogActions';
 import Snackbar from '@mui/material/Snackbar';
 import Alert from '@mui/material/Alert';
+import CircularProgress from '@mui/material/CircularProgress';
 import EditIcon from '@mui/icons-material/Edit';
 import SchoolIcon from '@mui/icons-material/School';
 import WorkspacePremiumIcon from '@mui/icons-material/WorkspacePremium';
 import FavoriteIcon from '@mui/icons-material/Favorite';
 import CreateIcon from '@mui/icons-material/Create';
 import LogoutIcon from '@mui/icons-material/Logout';
+import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import { motion } from 'framer-motion';
 import PageLayout from '../components/PageLayout';
-import { useAuthStore } from '../stores/authStore';
+import { useAuthStore, type AuthUser } from '../stores/authStore';
 import { useCourseStore } from '../stores/courseStore';
 import { useProgressStore } from '../stores/progressStore';
+import { supabase } from '../supabase/supabase';
 
 export default function ProfilePage() {
   const navigate = useNavigate();
-  const { user, isAuthenticated, logout, updateProfile } = useAuthStore();
+  const { id: profileId } = useParams<{ id: string }>();
+  const { user: currentUser, isAuthenticated, logout, updateProfile } = useAuthStore();
   const { enrolledCourses, courses, wishlist } = useCourseStore();
   const { getCourseProgress } = useProgressStore();
+  
+  const [profileUser, setProfileUser] = useState<AuthUser | null>(null);
+  const [loading, setLoading] = useState(true);
   const [editOpen, setEditOpen] = useState(false);
-  const [editForm, setEditForm] = useState({ name: user?.name || '', college: user?.college || '', year: user?.year || '', bio: user?.bio || '' });
+  const [editForm, setEditForm] = useState({ name: '', college: '', year: '', bio: '' });
   const [toast, setToast] = useState({ open: false, message: '' });
 
-  if (!isAuthenticated || !user) {
+  const isOwnProfile = !profileId || profileId === currentUser?.id;
+
+  useEffect(() => {
+    const fetchProfile = async () => {
+      setLoading(true);
+      if (isOwnProfile) {
+        setProfileUser(currentUser);
+        if (currentUser) {
+          setEditForm({ 
+            name: currentUser.name || '', 
+            college: currentUser.college || '', 
+            year: currentUser.year || '', 
+            bio: currentUser.bio || '' 
+          });
+        }
+        setLoading(false);
+      } else if (profileId) {
+        const { data: profile, error } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', profileId)
+          .single();
+        
+        if (!error && profile) {
+          setProfileUser({
+            id: profile.id,
+            name: profile.full_name || '',
+            email: profile.email || '',
+            college: profile.college || '',
+            year: profile.year || '',
+            role: (profile.role as 'student' | 'creator' | 'admin') || 'student',
+            avatar: profile.avatar_url || (profile.full_name ? profile.full_name.split(' ').map((n: string) => n[0]).join('').slice(0, 2).toUpperCase() : '??'),
+            bio: profile.bio || '',
+          });
+        }
+        setLoading(false);
+      }
+    };
+
+    fetchProfile();
+  }, [profileId, currentUser, isOwnProfile]);
+
+  if (loading) {
+    return (
+      <PageLayout>
+        <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '60vh' }}>
+          <CircularProgress />
+        </Box>
+      </PageLayout>
+    );
+  }
+
+  if (!profileUser) {
     return (
       <PageLayout>
         <Container maxWidth="sm" sx={{ py: 12, textAlign: 'center' }}>
           <Typography sx={{ fontSize: '3rem', mb: 2 }}>👤</Typography>
-          <Typography variant="h5" fontWeight={700} mb={2}>Sign in to view your profile</Typography>
-          <Button variant="contained" color="primary" onClick={() => navigate('/courses')}>
-            Browse Courses
+          <Typography variant="h5" fontWeight={700} mb={2}>
+            {isOwnProfile && !isAuthenticated ? 'Sign in to view your profile' : 'Profile not found'}
+          </Typography>
+          <Button variant="contained" color="primary" onClick={() => navigate(!isAuthenticated ? '/' : '/courses')}>
+            {!isAuthenticated ? 'Go Home' : 'Browse Courses'}
           </Button>
         </Container>
       </PageLayout>
@@ -77,6 +138,15 @@ export default function ProfilePage() {
       <Box sx={{ background: 'linear-gradient(135deg, #0E5B44 0%, #1A6B52 100%)', py: { xs: 5, md: 7 } }}>
         <Container maxWidth="lg">
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
+            {!isOwnProfile && (
+              <Button
+                startIcon={<ArrowBackIcon />}
+                onClick={() => navigate(-1)}
+                sx={{ color: 'rgba(255,255,255,0.8)', mb: 3, '&:hover': { color: 'white', bgcolor: 'rgba(255,255,255,0.1)' } }}
+              >
+                Back
+              </Button>
+            )}
             <Box sx={{ display: 'flex', gap: 3, alignItems: 'flex-start', flexWrap: 'wrap' }}>
               {/* Avatar */}
               <Box sx={{ position: 'relative' }}>
@@ -84,24 +154,25 @@ export default function ProfilePage() {
                   sx={{
                     width: { xs: 72, md: 96 },
                     height: { xs: 72, md: 96 },
-                    bgcolor: '#D4A017',
+                    bgcolor: profileUser.role === 'creator' ? '#D1FAE5' : '#D4A017',
+                    color: profileUser.role === 'creator' ? '#065F46' : 'white',
                     fontSize: { xs: '1.8rem', md: '2.4rem' },
                     fontWeight: 700,
                     border: '4px solid rgba(255,255,255,0.3)',
                   }}
                 >
-                  {user.avatar}
+                  {profileUser.avatar || profileUser.name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()}
                 </Avatar>
                 <Chip
-                  label={user.role}
+                  label={profileUser.role}
                   size="small"
                   sx={{
                     position: 'absolute',
                     bottom: -8,
                     left: '50%',
                     transform: 'translateX(-50%)',
-                    bgcolor: user.role === 'admin' ? '#FEF3C7' : user.role === 'creator' ? '#D1FAE5' : '#E0E7FF',
-                    color: user.role === 'admin' ? '#92400E' : user.role === 'creator' ? '#065F46' : '#3730A3',
+                    bgcolor: profileUser.role === 'admin' ? '#FEF3C7' : profileUser.role === 'creator' ? '#D1FAE5' : '#E0E7FF',
+                    color: profileUser.role === 'admin' ? '#92400E' : profileUser.role === 'creator' ? '#065F46' : '#3730A3',
                     fontWeight: 700,
                     fontSize: '0.65rem',
                     height: 20,
@@ -112,45 +183,47 @@ export default function ProfilePage() {
 
               <Box sx={{ flex: 1, mt: 1 }}>
                 <Typography variant="h4" sx={{ color: 'white', fontWeight: 700, mb: 0.5, fontSize: { xs: '1.5rem', md: '2rem' } }}>
-                  {user.name}
+                  {profileUser.name}
                 </Typography>
                 <Typography variant="body1" sx={{ color: 'rgba(255,255,255,0.8)', mb: 0.5 }}>
-                  🏫 {user.college} • {user.year}
+                  🏫 {profileUser.college} • {profileUser.year}
                 </Typography>
-                {user.bio && (
+                {profileUser.bio && (
                   <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.7)', mb: 1 }}>
-                    {user.bio}
+                    {profileUser.bio}
                   </Typography>
                 )}
                 <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.6)' }}>
-                  📧 {user.email}
+                  📧 {profileUser.email}
                 </Typography>
               </Box>
 
-              <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
-                <Button
-                  startIcon={<EditIcon />}
-                  onClick={() => { setEditForm({ name: user.name, college: user.college, year: user.year, bio: user.bio }); setEditOpen(true); }}
-                  sx={{ color: 'white', borderColor: 'rgba(255,255,255,0.4)', border: '1px solid', bgcolor: 'transparent', '&:hover': { bgcolor: 'rgba(255,255,255,0.1)' } }}
-                >
-                  Edit Profile
-                </Button>
-                <Button
-                  startIcon={<LogoutIcon />}
-                  onClick={handleLogout}
-                  sx={{ color: 'rgba(255,255,255,0.7)', '&:hover': { bgcolor: 'rgba(255,0,0,0.1)', color: '#FCA5A5' } }}
-                >
-                  Sign Out
-                </Button>
-              </Box>
+              {isOwnProfile && (
+                <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+                  <Button
+                    startIcon={<EditIcon />}
+                    onClick={() => { setEditForm({ name: profileUser.name, college: profileUser.college, year: profileUser.year, bio: profileUser.bio }); setEditOpen(true); }}
+                    sx={{ color: 'white', borderColor: 'rgba(255,255,255,0.4)', border: '1px solid', bgcolor: 'transparent', '&:hover': { bgcolor: 'rgba(255,255,255,0.1)' } }}
+                  >
+                    Edit Profile
+                  </Button>
+                  <Button
+                    startIcon={<LogoutIcon />}
+                    onClick={handleLogout}
+                    sx={{ color: 'rgba(255,255,255,0.7)', '&:hover': { bgcolor: 'rgba(255,0,0,0.1)', color: '#FCA5A5' } }}
+                  >
+                    Sign Out
+                  </Button>
+                </Box>
+              )}
             </Box>
 
             {/* Stats */}
             <Box sx={{ display: 'flex', gap: 4, mt: 4, flexWrap: 'wrap' }}>
               {[
-                { value: enrolledData.length, label: 'Enrolled', icon: '📚' },
-                { value: completedCourses.length, label: 'Completed', icon: '✅' },
-                { value: wishlistCourses.length, label: 'Wishlisted', icon: '❤️' },
+                { value: isOwnProfile ? enrolledData.length : 0, label: 'Enrolled', icon: '📚' },
+                { value: isOwnProfile ? completedCourses.length : 0, label: 'Completed', icon: '✅' },
+                { value: isOwnProfile ? wishlistCourses.length : 0, label: 'Wishlisted', icon: '❤️' },
               ].map((stat, i) => (
                 <Box key={i} sx={{ textAlign: 'center' }}>
                   <Typography sx={{ fontSize: '1.5rem', mb: 0.25 }}>{stat.icon}</Typography>
@@ -169,10 +242,14 @@ export default function ProfilePage() {
           <Grid size={{ xs: 12, md: 8 }}>
             <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}>
               <Typography variant="h6" fontWeight={700} mb={2} sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                <SchoolIcon sx={{ color: 'primary.main' }} /> My Courses ({enrolledData.length})
+                <SchoolIcon sx={{ color: 'primary.main' }} /> {isOwnProfile ? 'My Courses' : 'Courses'} ({isOwnProfile ? enrolledData.length : 0})
               </Typography>
 
-              {enrolledData.length === 0 ? (
+              {!isOwnProfile ? (
+                <Card sx={{ p: 3, textAlign: 'center' }}>
+                  <Typography color="text.secondary">Enrolled courses are private.</Typography>
+                </Card>
+              ) : enrolledData.length === 0 ? (
                 <Card sx={{ p: 3, textAlign: 'center' }}>
                   <Typography color="text.secondary">No courses enrolled yet.</Typography>
                   <Button variant="contained" color="primary" sx={{ mt: 2 }} onClick={() => navigate('/courses')}>
@@ -222,7 +299,7 @@ export default function ProfilePage() {
             </motion.div>
 
             {/* Certificates */}
-            {completedCourses.length > 0 && (
+            {isOwnProfile && completedCourses.length > 0 && (
               <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}>
                 <Typography variant="h6" fontWeight={700} mt={4} mb={2} sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                   <WorkspacePremiumIcon sx={{ color: '#D4A017' }} /> Certificates ({completedCourses.length})
@@ -265,43 +342,45 @@ export default function ProfilePage() {
           <Grid size={{ xs: 12, md: 4 }}>
             <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }}>
               {/* Wishlist */}
-              <Box mb={4}>
-                <Typography variant="h6" fontWeight={700} mb={2} sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                  <FavoriteIcon sx={{ color: '#DC2626' }} /> Wishlist ({wishlistCourses.length})
-                </Typography>
-                {wishlistCourses.slice(0, 3).map(c => (
-                  <Box
-                    key={c.id}
-                    sx={{
-                      display: 'flex',
-                      gap: 1.5,
-                      alignItems: 'center',
-                      py: 1.5,
-                      borderBottom: '1px solid',
-                      borderColor: 'divider',
-                      cursor: 'pointer',
-                      '&:hover': { bgcolor: 'rgba(14,91,68,0.04)' },
-                    }}
-                    onClick={() => navigate(`/courses/${c.id}`)}
-                  >
-                    <Box sx={{ width: 40, height: 40, borderRadius: 1.5, bgcolor: 'primary.main', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.1rem', flexShrink: 0 }}>🌿</Box>
-                    <Box sx={{ flex: 1, minWidth: 0 }}>
-                      <Typography variant="caption" fontWeight={600} display="block" noWrap>{c.title}</Typography>
-                      <Typography variant="caption" color="primary.main" fontWeight={700}>
-                        {c.free ? 'Free' : `₹${c.price.toLocaleString()}`}
-                      </Typography>
+              {isOwnProfile && (
+                <Box mb={4}>
+                  <Typography variant="h6" fontWeight={700} mb={2} sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                    <FavoriteIcon sx={{ color: '#DC2626' }} /> Wishlist ({wishlistCourses.length})
+                  </Typography>
+                  {wishlistCourses.slice(0, 3).map(c => (
+                    <Box
+                      key={c.id}
+                      sx={{
+                        display: 'flex',
+                        gap: 1.5,
+                        alignItems: 'center',
+                        py: 1.5,
+                        borderBottom: '1px solid',
+                        borderColor: 'divider',
+                        cursor: 'pointer',
+                        '&:hover': { bgcolor: 'rgba(14,91,68,0.04)' },
+                      }}
+                      onClick={() => navigate(`/courses/${c.id}`)}
+                    >
+                      <Box sx={{ width: 40, height: 40, borderRadius: 1.5, bgcolor: 'primary.main', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.1rem', flexShrink: 0 }}>🌿</Box>
+                      <Box sx={{ flex: 1, minWidth: 0 }}>
+                        <Typography variant="caption" fontWeight={600} display="block" noWrap>{c.title}</Typography>
+                        <Typography variant="caption" color="primary.main" fontWeight={700}>
+                          {c.free ? 'Free' : `₹${c.price.toLocaleString()}`}
+                        </Typography>
+                      </Box>
                     </Box>
-                  </Box>
-                ))}
-                {wishlistCourses.length === 0 && (
-                  <Typography variant="body2" color="text.secondary">No wishlisted courses yet.</Typography>
-                )}
-              </Box>
+                  ))}
+                  {wishlistCourses.length === 0 && (
+                    <Typography variant="body2" color="text.secondary">No wishlisted courses yet.</Typography>
+                  )}
+                </Box>
+              )}
 
-              <Divider />
+              {isOwnProfile && <Divider />}
 
               {/* Become Creator */}
-              {user.role === 'student' && (
+              {isOwnProfile && profileUser.role === 'student' && (
                 <Box sx={{ mt: 3, p: 3, bgcolor: '#F0FDF4', borderRadius: 3, border: '1px solid #BBF7D0' }}>
                   <Typography sx={{ fontSize: '2rem', mb: 1 }}>🎓</Typography>
                   <Typography variant="subtitle1" fontWeight={700} color="primary.main" mb={1}>
@@ -322,7 +401,7 @@ export default function ProfilePage() {
                 </Box>
               )}
 
-              {user.role !== 'student' && (
+              {isOwnProfile && profileUser.role !== 'student' && (
                 <Box sx={{ mt: 3 }}>
                   <Button
                     variant="contained"
@@ -332,6 +411,17 @@ export default function ProfilePage() {
                   >
                     Go to Creator Dashboard
                   </Button>
+                </Box>
+              )}
+              
+              {!isOwnProfile && profileUser.role === 'creator' && (
+                <Box sx={{ p: 3, bgcolor: '#F0FDF4', borderRadius: 3, border: '1px solid #BBF7D0' }}>
+                  <Typography variant="subtitle1" fontWeight={700} color="primary.main" mb={1}>
+                    Creator Profile
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    This user is a verified creator on AyurVidyapeeth.
+                  </Typography>
                 </Box>
               )}
             </motion.div>
