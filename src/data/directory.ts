@@ -15,6 +15,21 @@ export interface DirectoryEntry {
   characteristics?: string[];
   subtypes?: string[];
   properties?: Record<string, string>;
+
+  // Detailed Ayurvedic Fields
+  introduction?: string;
+  etiology?: string;
+  synonyms?: string[];
+  origin?: string;
+  panchabhautikatva?: string;
+  swaroop?: string;
+  fourCharacteristics?: string[];
+  typesDescription?: string;
+  sankhya?: string;
+  prakarCharak?: string;
+  prakarSushruta?: string;
+  viddhaLakshan?: string;
+  dushti?: string;
 }
 
 export const directoryEntries: DirectoryEntry[] = [
@@ -27,7 +42,20 @@ export const directoryEntries: DirectoryEntry[] = [
     meaning: 'Channels carrying Prana (vital life force)',
     shortDescription: 'The principal respiratory channel system responsible for the movement of Prana Vayu throughout the body.',
     definition: 'Pranavaha Srotas refers to the channels through which Prana Vayu — the vital breath and life energy — circulates throughout the body. According to Charaka, these channels have their roots in the Hridaya (heart) and Mahasrotas (alimentary canal). They are responsible for maintaining the fundamental life process, coordinating breath with the activity of all other body systems.',
+    introduction: 'Pranavaha Srotas are the vital channels that carry "Prana" (the life force or vital breath). In Ayurveda, life is defined as the union of body, senses, mind, and soul, and Prana is the energy that sustains this union. It is primarily associated with the respiratory and cardiovascular systems.',
+    etiology: 'The vitiation of Pranavaha Srotas is caused by: 1. Consumption of dry, cold, and light food (Vata-aggravating). 2. Suppression of natural urges (Vega-dharana). 3. Excessive physical exercise beyond capacity. 4. Constant exposure to hunger and emaciation. 5. Improper lifestyle that disturbs the natural rhythm of breath.',
+    synonyms: ['Srotamsi', 'Sirah', 'Dhamanya', 'Rasayani', 'Nadi', 'Panthana', 'Marga', 'Sharira-chidra', 'Samvrita-asamvritani', 'Sthana', 'Ashaya', 'Niketa'],
+    origin: 'According to Ayurvedic embryology, Srotas originate during fetal development when the subtle spaces are formed by the action of Vayu (air element) in the fetus. They are considered the physical manifestation of the space element (Akasha) within the biological structure.',
+    panchabhautikatva: 'Srotas are predominantly composed of the Akasha Mahabhuta (Space element), which provides the void for movement, and Vayu Mahabhuta (Air element), which facilitates the flow and transport of substances.',
+    swaroop: 'Srotas are described as: 1. Swa-dhatu-sama-varnani (matching the color of the tissue they carry). 2. Vritta (Cylindrical or round). 3. Sthula-Anu (Range from gross to microscopic). 4. Bisinipushpavat (Like the internal structures of a lotus stem).',
+    fourCharacteristics: ['Vritta (Circular/Round)', 'Sthula (Thick/Gross)', 'Anu (Minute/Microscopic)', 'Deergha (Long/Stretched)'],
+    typesDescription: 'Srotas are broadly classified into two types: 1. Bahirmukha Srotas (External openings - 9 in males, 12 in females). 2. Yogavahi/Abhyantara Srotas (Internal channels that transport Dhatus and Malas).',
+    sankhya: 'Acharya Charaka mentions 13 pairs of internal Srotas, while Acharya Sushruta mentions 11 pairs (22 total) as being surgically significant (Yogavahi).',
+    prakarCharak: 'Pranavaha, Udakavaha, Annavaha, Rasavaha, Raktavaha, Mansavaha, Medovaha, Asthivaha, Majjavaha, Shukravaha, Mutravaha, Purishavaha, Swedavaha.',
+    prakarSushruta: 'Similar to Charaka but differs by excluding Asthi, Majja, and Sweda channels, while adding Artavavaha Srotas (for females).',
     moolasthana: 'Hridaya (Heart) and Mahasrotas (Great Channel/Alimentary Canal)',
+    viddhaLakshan: 'When Pranavaha Srotas is injured or severely obstructed (Viddha), it leads to: 1. Shvasita (Disturbed breathing). 2. Vinaman (Bending of body). 3. Moha (Delirium/Confusion). 4. Bramana (Dizziness). 5. Veepana (Tremors) and even death.',
+    dushti: 'Symptoms of Srotas Dushti (vitiation): 1. Atisrushta (Excessive flow). 2. Atibaddha (Obstructed flow). 3. Sira Granthi (Tumors/Nodules). 4. Vimarga Gamana (Flow in wrong direction).',
     functions: [
       'Transports Prana Vayu throughout the body',
       'Coordinates respiratory movements',

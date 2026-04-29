@@ -51,13 +51,23 @@ export default function TopicDetailPage() {
   const accentColor = sectionColors[entry.category] || '#0E5B44';
 
   const tocItems = [
+    entry.introduction ? 'Introduction' : null,
+    entry.etiology ? 'Etiology' : null,
+    entry.synonyms ? 'Synonyms' : null,
+    entry.origin ? 'Origin' : null,
     'Definition',
-    entry.moolasthana ? 'Moolasthana' : null,
+    entry.panchabhautikatva ? 'Panchabhautikatva' : null,
+    entry.swaroop ? 'Swaroop' : null,
+    entry.fourCharacteristics ? 'Characteristics' : null,
+    entry.typesDescription ? 'Types' : null,
+    entry.sankhya ? 'Sankhya' : null,
+    entry.prakarCharak ? 'Charak Classification' : null,
+    entry.prakarSushruta ? 'Sushruta Classification' : null,
+    'Mula Sthana & Dushti',
     'Functions',
     'Disorders',
     'Treatment Principles',
     entry.properties ? 'Properties' : null,
-    entry.subtypes || entry.characteristics ? 'Classifications' : null,
     'Related Courses',
   ].filter(Boolean) as string[];
 
@@ -141,135 +151,228 @@ export default function TopicDetailPage() {
 
           {/* Main Content */}
           <Grid size={{ xs: 12, md: 9 }}>
-            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
 
-              {/* Definition */}
-              <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}>
-                <Section title="Definition" icon="📖">
+              {/* 1. Introduction */}
+              {entry.introduction && (
+                <Section title="Introduction" icon="📜">
                   <Typography variant="body1" color="text.secondary" sx={{ lineHeight: 1.8 }}>
-                    {entry.definition}
+                    {entry.introduction}
                   </Typography>
                 </Section>
-              </motion.div>
-
-              {/* Moolasthana */}
-              {entry.moolasthana && (
-                <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }}>
-                  <Section title="Moolasthana (Origin)" icon="🎯">
-                    <Box sx={{ p: 2.5, bgcolor: '#F0FDF4', borderRadius: 2, border: '1px solid #BBF7D0' }}>
-                      <Typography variant="subtitle1" fontWeight={600} color="primary.main">
-                        {entry.moolasthana}
-                      </Typography>
-                    </Box>
-                  </Section>
-                </motion.div>
               )}
 
-              {/* Functions */}
-              <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}>
-                <Section title="Functions (Karma)" icon="⚙️">
-                  <List dense sx={{ p: 0 }}>
-                    {entry.functions.map((fn, i) => (
-                      <ListItem key={i} sx={{ px: 0, py: 0.5 }}>
-                        <ListItemIcon sx={{ minWidth: 32 }}>
-                          <CheckCircleOutlineIcon sx={{ fontSize: 18, color: 'primary.main' }} />
-                        </ListItemIcon>
-                        <ListItemText primary={fn} primaryTypographyProps={{ variant: 'body2', lineHeight: 1.6 }} />
-                      </ListItem>
-                    ))}
-                  </List>
+              {/* 2. Etiology */}
+              {entry.etiology && (
+                <Section title="Etiology (Nidana)" icon="🔬">
+                  <Typography variant="body1" color="text.secondary" sx={{ lineHeight: 1.8, whiteSpace: 'pre-line' }}>
+                    {entry.etiology}
+                  </Typography>
                 </Section>
-              </motion.div>
+              )}
 
-              <Divider />
-
-              {/* Disorders */}
-              <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.25 }}>
-                <Section title="Associated Disorders (Vikara)" icon="🩺">
+              {/* 3. Synonyms */}
+              {entry.synonyms && (
+                <Section title="Synonyms (Paryaya)" icon="🏷️">
                   <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
-                    {entry.disorders.map((d, i) => (
-                      <Chip
-                        key={i}
-                        label={d}
-                        sx={{ bgcolor: '#FEF2F2', color: '#DC2626', borderColor: '#FECACA', border: '1px solid' }}
-                      />
+                    {entry.synonyms.map((s, i) => (
+                      <Chip key={i} label={s} variant="outlined" sx={{ color: 'primary.main', fontWeight: 500 }} />
                     ))}
                   </Box>
                 </Section>
-              </motion.div>
+              )}
+
+              {/* 4. Origin */}
+              {entry.origin && (
+                <Section title="Origin (Utpatti)" icon="🌱">
+                  <Typography variant="body1" color="text.secondary" sx={{ lineHeight: 1.8 }}>
+                    {entry.origin}
+                  </Typography>
+                </Section>
+              )}
+
+              {/* 5. Definition */}
+              <Section title="Definition" icon="📖">
+                <Typography variant="body1" color="text.secondary" sx={{ lineHeight: 1.8 }}>
+                  {entry.definition}
+                </Typography>
+              </Section>
+
+              {/* 6. Panchabhautikatva */}
+              {entry.panchabhautikatva && (
+                <Section title="Panchabhautikatva" icon="🌫️">
+                  <Box sx={{ p: 2.5, bgcolor: 'rgba(14,91,68,0.03)', borderRadius: 2, border: '1px solid', borderColor: 'divider' }}>
+                    <Typography variant="body1" color="text.secondary">
+                      {entry.panchabhautikatva}
+                    </Typography>
+                  </Box>
+                </Section>
+              )}
+
+              {/* 7. Swaroop */}
+              {entry.swaroop && (
+                <Section title="Swaroop (Appearance)" icon="👁️">
+                  <Typography variant="body1" color="text.secondary" sx={{ lineHeight: 1.8, whiteSpace: 'pre-line' }}>
+                    {entry.swaroop}
+                  </Typography>
+                </Section>
+              )}
+
+              {/* 8. Characteristics */}
+              {entry.fourCharacteristics && (
+                <Section title="Four Characteristics" icon="✨">
+                  <Grid container spacing={2}>
+                    {entry.fourCharacteristics.map((c, i) => (
+                      <Grid key={i} size={{ xs: 6, sm: 3 }}>
+                        <Box sx={{ p: 2, textAlign: 'center', bgcolor: 'white', borderRadius: 2, border: '1px solid', borderColor: 'divider' }}>
+                          <Typography variant="subtitle2" fontWeight={700} color="primary.main">
+                            {c}
+                          </Typography>
+                        </Box>
+                      </Grid>
+                    ))}
+                  </Grid>
+                </Section>
+              )}
+
+              {/* 9. Types */}
+              {entry.typesDescription && (
+                <Section title="Types of Srotas" icon="📂">
+                  <Typography variant="body1" color="text.secondary" sx={{ lineHeight: 1.8, whiteSpace: 'pre-line' }}>
+                    {entry.typesDescription}
+                  </Typography>
+                </Section>
+              )}
+
+              {/* 10. Sankhya */}
+              {entry.sankhya && (
+                <Section title="Srotas Sankhya" icon="🔢">
+                  <Box sx={{ p: 2.5, bgcolor: '#FFFBEB', borderRadius: 2, border: '1px solid #FEF3C7' }}>
+                    <Typography variant="body1" color="#92400E" fontWeight={500}>
+                      {entry.sankhya}
+                    </Typography>
+                  </Box>
+                </Section>
+              )}
+
+              {/* 11 & 12. Classifications */}
+              {(entry.prakarCharak || entry.prakarSushruta) && (
+                <Section title="Classifications" icon="📚">
+                  <Grid container spacing={3}>
+                    {entry.prakarCharak && (
+                      <Grid size={{ xs: 12, md: 6 }}>
+                        <Typography variant="subtitle2" gutterBottom fontWeight={700}>Acharya Charak</Typography>
+                        <Typography variant="body2" color="text.secondary" sx={{ lineHeight: 1.7 }}>
+                          {entry.prakarCharak}
+                        </Typography>
+                      </Grid>
+                    )}
+                    {entry.prakarSushruta && (
+                      <Grid size={{ xs: 12, md: 6 }}>
+                        <Typography variant="subtitle2" gutterBottom fontWeight={700}>Acharya Sushruta</Typography>
+                        <Typography variant="body2" color="text.secondary" sx={{ lineHeight: 1.7 }}>
+                          {entry.prakarSushruta}
+                        </Typography>
+                      </Grid>
+                    )}
+                  </Grid>
+                </Section>
+              )}
+
+              <Divider />
+
+              {/* 13. Mula Sthana, Viddha Lakshan, Dushti */}
+              <Section title="Mula Sthana & Dushti" icon="🎯">
+                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                  {entry.moolasthana && (
+                    <Box sx={{ p: 2, bgcolor: '#F0FDF4', borderRadius: 2, border: '1px solid #BBF7D0' }}>
+                      <Typography variant="caption" color="primary.main" fontWeight={700} display="block" gutterBottom uppercase>
+                        Mula Sthana (Origin)
+                      </Typography>
+                      <Typography variant="body1" fontWeight={600} color="primary.dark">
+                        {entry.moolasthana}
+                      </Typography>
+                    </Box>
+                  )}
+                  {entry.viddhaLakshan && (
+                    <Box sx={{ p: 2, bgcolor: '#FEF2F2', borderRadius: 2, border: '1px solid #FECACA' }}>
+                      <Typography variant="caption" color="#DC2626" fontWeight={700} display="block" gutterBottom uppercase>
+                        Viddha Lakshan (Injury Symptoms)
+                      </Typography>
+                      <Typography variant="body2" color="#991B1B">
+                        {entry.viddhaLakshan}
+                      </Typography>
+                    </Box>
+                  )}
+                  {entry.dushti && (
+                    <Box sx={{ p: 2, bgcolor: '#F8FAFC', borderRadius: 2, border: '1px solid #E2E8F0' }}>
+                      <Typography variant="caption" color="text.secondary" fontWeight={700} display="block" gutterBottom uppercase>
+                        Dushti (Vitiation Symptoms)
+                      </Typography>
+                      <Typography variant="body2" color="text.primary">
+                        {entry.dushti}
+                      </Typography>
+                    </Box>
+                  )}
+                </Box>
+              </Section>
+
+              {/* Functions */}
+              <Section title="Functions (Karma)" icon="⚙️">
+                <List dense sx={{ p: 0 }}>
+                  {entry.functions.map((fn, i) => (
+                    <ListItem key={i} sx={{ px: 0, py: 0.5 }}>
+                      <ListItemIcon sx={{ minWidth: 32 }}>
+                        <CheckCircleOutlineIcon sx={{ fontSize: 18, color: 'primary.main' }} />
+                      </ListItemIcon>
+                      <ListItemText primary={fn} primaryTypographyProps={{ variant: 'body2', lineHeight: 1.6 }} />
+                    </ListItem>
+                  ))}
+                </List>
+              </Section>
+
+              {/* Disorders */}
+              <Section title="Associated Disorders (Vikara)" icon="🩺">
+                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+                  {entry.disorders.map((d, i) => (
+                    <Chip
+                      key={i}
+                      label={d}
+                      sx={{ bgcolor: '#FEF2F2', color: '#DC2626', borderColor: '#FECACA', border: '1px solid' }}
+                    />
+                  ))}
+                </Box>
+              </Section>
 
               {/* Treatment Principles */}
-              <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }}>
-                <Section title="Treatment Principles (Chikitsa Sutra)" icon="💊">
-                  <List dense sx={{ p: 0 }}>
-                    {entry.treatmentPrinciples.map((t, i) => (
-                      <ListItem key={i} sx={{ px: 0, py: 0.5 }}>
-                        <ListItemIcon sx={{ minWidth: 32 }}>
-                          <Box sx={{ width: 20, height: 20, borderRadius: '50%', bgcolor: '#FEF3C7', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                            <Typography variant="caption" sx={{ fontWeight: 700, color: '#92400E', fontSize: '0.65rem' }}>
-                              {i + 1}
-                            </Typography>
-                          </Box>
-                        </ListItemIcon>
-                        <ListItemText primary={t} primaryTypographyProps={{ variant: 'body2', lineHeight: 1.6 }} />
-                      </ListItem>
-                    ))}
-                  </List>
-                </Section>
-              </motion.div>
-
-              {/* Properties (for Herbs) */}
-              {entry.properties && (
-                <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.35 }}>
-                  <Section title="Properties (Gunadharma)" icon="🔬">
-                    <Grid container spacing={2}>
-                      {Object.entries(entry.properties).map(([key, value]) => (
-                        <Grid key={key} size={{ xs: 6, sm: 4 }}>
-                          <Box sx={{ p: 2, bgcolor: 'rgba(14,91,68,0.04)', borderRadius: 2, border: '1px solid', borderColor: 'divider' }}>
-                            <Typography variant="caption" color="text.secondary" fontWeight={600} display="block">
-                              {key}
-                            </Typography>
-                            <Typography variant="body2" fontWeight={600} color="primary.main">
-                              {value}
-                            </Typography>
-                          </Box>
-                        </Grid>
-                      ))}
-                    </Grid>
-                  </Section>
-                </motion.div>
-              )}
-
-              {/* Subtypes / Characteristics */}
-              {(entry.subtypes || entry.characteristics) && (
-                <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.4 }}>
-                  <Section title={entry.subtypes ? 'Types (Bheda)' : 'Characteristics (Guna)'} icon="📂">
-                    <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
-                      {(entry.subtypes || entry.characteristics || []).map((item, i) => (
-                        <Chip
-                          key={i}
-                          label={item}
-                          sx={{ bgcolor: 'rgba(14,91,68,0.06)', color: 'primary.main', fontWeight: 500 }}
-                        />
-                      ))}
-                    </Box>
-                  </Section>
-                </motion.div>
-              )}
+              <Section title="Treatment Principles (Chikitsa Sutra)" icon="💊">
+                <List dense sx={{ p: 0 }}>
+                  {entry.treatmentPrinciples.map((t, i) => (
+                    <ListItem key={i} sx={{ px: 0, py: 0.5 }}>
+                      <ListItemIcon sx={{ minWidth: 32 }}>
+                        <Box sx={{ width: 20, height: 20, borderRadius: '50%', bgcolor: '#FEF3C7', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                          <Typography variant="caption" sx={{ fontWeight: 700, color: '#92400E', fontSize: '0.65rem' }}>
+                            {i + 1}
+                          </Typography>
+                        </Box>
+                      </ListItemIcon>
+                      <ListItemText primary={t} primaryTypographyProps={{ variant: 'body2', lineHeight: 1.6 }} />
+                    </ListItem>
+                  ))}
+                </List>
+              </Section>
 
               {/* Related Courses */}
               {relatedCourses.length > 0 && (
-                <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.5 }}>
-                  <Section title="Related Courses" icon="🎓">
-                    <Grid container spacing={2}>
-                      {relatedCourses.map((course, i) => (
-                        <Grid key={course.id} size={{ xs: 12, sm: 6 }}>
-                          <CourseCard course={course} index={i} />
-                        </Grid>
-                      ))}
-                    </Grid>
-                  </Section>
-                </motion.div>
+                <Section title="Related Courses" icon="🎓">
+                  <Grid container spacing={2}>
+                    {relatedCourses.map((course, i) => (
+                      <Grid key={course.id} size={{ xs: 12, sm: 6 }}>
+                        <CourseCard course={course} index={i} />
+                      </Grid>
+                    ))}
+                  </Grid>
+                </Section>
               )}
             </Box>
           </Grid>
