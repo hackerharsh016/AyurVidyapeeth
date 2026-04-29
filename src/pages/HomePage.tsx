@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Box from '@mui/material/Box';
 import Container from '@mui/material/Container';
@@ -15,15 +15,17 @@ import { useRef } from 'react';
 import PageLayout from '../components/PageLayout';
 import CourseCard from '../components/CourseCard';
 import { useCourseStore } from '../stores/courseStore';
+import { supabase } from '../supabase/supabase';
 
-const popularTopics = [
-  { label: 'Pranavaha Srotas', slug: 'pranavaha-srotas', icon: '💨', desc: 'Respiratory channels' },
-  { label: 'Rasavaha Srotas', slug: 'rasavaha-srotas', icon: '💧', desc: 'Nutritive channels' },
-  { label: 'Vata Dosha', slug: 'vata-dosha', icon: '🌬️', desc: 'Kinetic force' },
-  { label: 'Pitta Dosha', slug: 'pitta-dosha', icon: '🔥', desc: 'Metabolic force' },
-  { label: 'Kapha Dosha', slug: 'kapha-dosha', icon: '🌊', desc: 'Structural force' },
-  { label: 'Ashwagandha', slug: 'ashwagandha', icon: '🌿', desc: 'King of herbs' },
-];
+interface Topic {
+  id: string;
+  label: string;
+  slug: string;
+  icon: string | null;
+  description: string | null;
+  sort_order: number | null;
+  created_at: string | null;
+}
 
 function FadeInSection({ children, delay = 0 }: { children: React.ReactNode; delay?: number }) {
   const ref = useRef(null);
@@ -43,6 +45,58 @@ function FadeInSection({ children, delay = 0 }: { children: React.ReactNode; del
 export default function HomePage() {
   const navigate = useNavigate();
   const { courses, testimonials } = useCourseStore();
+  const [topics, setTopics] = useState<Topic[]>([]);
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const [topicsLoading, setTopicsLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchTopics = async () => {
+      const { data } = await supabase
+        .from('homepage_topics')
+        .select('*')
+        .order('sort_order', { ascending: true });
+      
+      if (data && data.length > 0) {
+        setTopics(data);
+      } else {
+        // Fallback to template data if DB is empty
+        setTopics([
+          {
+            id: '1', label: 'Pranavaha Srotas', slug: 'pranavaha-srotas', icon: '💨', description: 'Respiratory channels',
+            sort_order: null,
+            created_at: null
+          },
+          {
+            id: '2', label: 'Rasavaha Srotas', slug: 'rasavaha-srotas', icon: '💧', description: 'Nutritive channels',
+            sort_order: null,
+            created_at: null
+          },
+          {
+            id: '3', label: 'Vata Dosha', slug: 'vata-dosha', icon: '🌬️', description: 'Kinetic force',
+            sort_order: null,
+            created_at: null
+          },
+          {
+            id: '4', label: 'Pitta Dosha', slug: 'pitta-dosha', icon: '🔥', description: 'Metabolic force',
+            sort_order: null,
+            created_at: null
+          },
+          {
+            id: '5', label: 'Kapha Dosha', slug: 'kapha-dosha', icon: '🌊', description: 'Structural force',
+            sort_order: null,
+            created_at: null
+          },
+          {
+            id: '6', label: 'Ashwagandha', slug: 'ashwagandha', icon: '🌿', description: 'King of herbs',
+            sort_order: null,
+            created_at: null
+          },
+        ]);
+      }
+      setTopicsLoading(false);
+    };
+    fetchTopics();
+  }, []);
 
   const publishedCourses = useMemo(() => courses.filter(c => c.status === 'published'), [courses]);
   const featuredCourses = useMemo(() => publishedCourses.slice(0, 6), [publishedCourses]);
@@ -245,7 +299,7 @@ export default function HomePage() {
             </Box>
           </FadeInSection>
           <Grid container spacing={2}>
-            {popularTopics.map((topic, i) => (
+            {topics.map((topic, i) => (
               <Grid key={topic.slug} size={{ xs: 6, sm: 4, md: 2 }}>
                 <FadeInSection delay={i * 0.08}>
                   <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.98 }}>
@@ -255,6 +309,7 @@ export default function HomePage() {
                         cursor: 'pointer',
                         textAlign: 'center',
                         p: 2,
+                        height: '100%',
                         border: '2px solid transparent',
                         '&:hover': {
                           border: '2px solid',
@@ -268,7 +323,7 @@ export default function HomePage() {
                         {topic.label}
                       </Typography>
                       <Typography variant="caption" color="text.secondary">
-                        {topic.desc}
+                        {topic.description}
                       </Typography>
                     </Card>
                   </motion.div>

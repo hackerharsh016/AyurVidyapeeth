@@ -29,6 +29,7 @@ import Alert from '@mui/material/Alert';
 import CircularProgress from '@mui/material/CircularProgress';
 import Divider from '@mui/material/Divider';
 import IconButton from '@mui/material/IconButton';
+import TextField from '@mui/material/TextField';
 
 import HomeIcon from '@mui/icons-material/Home';
 import PersonIcon from '@mui/icons-material/Person';
@@ -40,6 +41,10 @@ import CancelIcon from '@mui/icons-material/Cancel';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import AdminPanelSettingsIcon from '@mui/icons-material/AdminPanelSettings';
 import RefreshIcon from '@mui/icons-material/Refresh';
+import EditIcon from '@mui/icons-material/Edit';
+import DeleteIcon from '@mui/icons-material/Delete';
+import AddIcon from '@mui/icons-material/Add';
+import WebIcon from '@mui/icons-material/Web';
 
 import { motion, AnimatePresence } from 'framer-motion';
 import PageLayout from '../../components/PageLayout';
@@ -58,7 +63,7 @@ interface AdminUser {
   courses: number;
 }
 
-type AdminView = 'home' | 'students' | 'creators' | 'courses' | 'approvals';
+type AdminView = 'home' | 'homepage' | 'students' | 'creators' | 'courses' | 'approvals';
 
 interface Profile {
   id: string;
@@ -72,6 +77,16 @@ interface Profile {
 interface EnrollmentWithCourse {
   user_id: string | null;
   courses: { price: number } | null;
+}
+
+interface Topic {
+  id?: string;
+  label: string;
+  slug: string;
+  icon: string | null;
+  description: string | null;
+  sort_order: number | null;
+  created_at?: string | null;
 }
 
 export default function AdminPanel() {
@@ -92,6 +107,12 @@ export default function AdminPanel() {
   ]);
   const [adminUsers, setAdminUsers] = useState<AdminUser[]>([]);
 
+  // Homepage topics state
+  const [homepageTopics, setHomepageTopics] = useState<Topic[]>([]);
+  const [topicDialogOpen, setTopicDialogOpen] = useState(false);
+  const [editingTopic, setEditingTopic] = useState<Topic | null>(null);
+  const [topicForm, setTopicForm] = useState<Topic>({ label: '', slug: '', icon: '', description: '', sort_order: 0 });
+
   const fetchData = async () => {
     setLoading(true);
     setDebugInfo(null);
@@ -108,15 +129,17 @@ export default function AdminPanel() {
         .select('*')
         .eq('role', 'student');
 
-      const [enRes, crRes, coursesCountRes] = await Promise.all([
+      const [enRes, crRes, coursesCountRes, topicsRes] = await Promise.all([
         supabase.from('enrollments').select('user_id, courses(price)'),
         supabase.from('courses').select('creator_id'),
-        supabase.from('courses').select('*', { count: 'exact', head: true })
+        supabase.from('courses').select('*', { count: 'exact', head: true }),
+        supabase.from('homepage_topics').select('*').order('sort_order', { ascending: true })
       ]);
 
       const enrollments = (enRes.data as unknown as EnrollmentWithCourse[]) || [];
       const ownedCourses = crRes.data || [];
       const totalCourses = coursesCountRes.count || 0;
+      setHomepageTopics(topicsRes.data || []);
 
       const revenue = enrollments.reduce((acc: number, curr: EnrollmentWithCourse) => acc + (Number(curr.courses?.price) || 0), 0);
       const formatCurrency = (amount: number) => {
@@ -203,8 +226,51 @@ export default function AdminPanel() {
     setToast({ open: true, message: `❌ "${title}" rejected.`, severity: 'info' });
   };
 
+  // Topic management
+  const handleSaveTopic = async () => {
+    try {
+      if (editingTopic) {
+        await supabase.from('homepage_topics').update(topicForm).eq('id', editingTopic.id);
+        setToast({ open: true, message: 'Topic updated successfully!', severity: 'success' });
+      } else {
+        await supabase.from('homepage_topics').insert(topicForm);
+        setToast({ open: true, message: 'Topic created successfully!', severity: 'success' });
+      }
+      setTopicDialogOpen(false);
+      fetchData();
+    } catch (err: any) {
+      setToast({ open: true, message: `Failed: ${err.message}`, severity: 'error' });
+    }
+  };
+
+  const handleDeleteTopic = async (id: string) => {
+    if (!confirm('Are you sure you want to delete this topic?')) return;
+    try {
+      await supabase.from('homepage_topics').delete().eq('id', id);
+      setToast({ open: true, message: 'Topic deleted!', severity: 'info' });
+      fetchData();
+    } catch (err: any) {
+      setToast({ open: true, message: `Failed: ${err.message}`, severity: 'error' });
+    }
+  };
+
+  const seedTopics = async () => {
+    const templates = [
+      { label: 'Pranavaha Srotas', slug: 'pranavaha-srotas', icon: '💨', description: 'Respiratory channels', sort_order: 1 },
+      { label: 'Rasavaha Srotas', slug: 'rasavaha-srotas', icon: '💧', description: 'Nutritive channels', sort_order: 2 },
+      { label: 'Vata Dosha', slug: 'vata-dosha', icon: '🌬️', description: 'Kinetic force', sort_order: 3 },
+      { label: 'Pitta Dosha', slug: 'pitta-dosha', icon: '🔥', description: 'Metabolic force', sort_order: 4 },
+      { label: 'Kapha Dosha', slug: 'kapha-dosha', icon: '🌊', description: 'Structural force', sort_order: 5 },
+      { label: 'Ashwagandha', slug: 'ashwagandha', icon: '🌿', description: 'King of herbs', sort_order: 6 },
+    ];
+    await supabase.from('homepage_topics').insert(templates);
+    setToast({ open: true, message: 'Template topics seeded!', severity: 'success' });
+    fetchData();
+  };
+
   const sidebarItems = [
     { id: 'home', label: 'Dashboard', icon: <HomeIcon /> },
+    { id: 'homepage', label: 'Homepage', icon: <WebIcon /> },
     { id: 'students', label: 'Students', icon: <SchoolIcon /> },
     { id: 'creators', label: 'Creators', icon: <PersonIcon /> },
     { id: 'courses', label: 'All Courses', icon: <MenuBookIcon /> },
@@ -462,6 +528,60 @@ export default function AdminPanel() {
                     </>
                   )}
 
+                  {/* Homepage View */}
+                  {view === 'homepage' && (
+                    <>
+                      <Box sx={{ mb: 4, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <Box>
+                          <Typography variant="h4" fontWeight={700} gutterBottom>Homepage Settings</Typography>
+                          <Typography variant="body2" color="text.secondary">Manage topics and content shown on the landing page.</Typography>
+                        </Box>
+                        <Box sx={{ display: 'flex', gap: 1 }}>
+                          {homepageTopics.length === 0 && (
+                            <Button variant="outlined" startIcon={<RefreshIcon />} onClick={seedTopics}>Seed Templates</Button>
+                          )}
+                          <Button 
+                            variant="contained" 
+                            startIcon={<AddIcon />} 
+                            onClick={() => {
+                              setEditingTopic(null);
+                              setTopicForm({ label: '', slug: '', icon: '', description: '', sort_order: homepageTopics.length + 1 });
+                              setTopicDialogOpen(true);
+                            }}
+                          >
+                            Add Topic
+                          </Button>
+                        </Box>
+                      </Box>
+
+                      <Typography variant="h6" fontWeight={700} mb={2}>Explore Topics Section</Typography>
+                      <Grid container spacing={2}>
+                        {homepageTopics.map((topic) => (
+                          <Grid key={topic.id} size={{ xs: 12, sm: 6, md: 4 }}>
+                            <Card elevation={0} sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 3 }}>
+                              <CardContent sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
+                                <Box sx={{ fontSize: '2rem' }}>{topic.icon}</Box>
+                                <Box sx={{ flex: 1 }}>
+                                  <Typography variant="subtitle1" fontWeight={700}>{topic.label}</Typography>
+                                  <Typography variant="caption" color="text.secondary" noWrap display="block">slug: {topic.slug}</Typography>
+                                  <Typography variant="caption" color="text.secondary" noWrap display="block">{topic.description}</Typography>
+                                </Box>
+                                <Box>
+                                  <IconButton size="small" onClick={() => {
+                                    setEditingTopic(topic);
+                                    setTopicForm(topic);
+                                    setTopicDialogOpen(true);
+                                  }}><EditIcon fontSize="small" /></IconButton>
+                                  <IconButton size="small" color="error" onClick={() => topic.id && handleDeleteTopic(topic.id)}><DeleteIcon fontSize="small" /></IconButton>
+                                </Box>
+                              </CardContent>
+                            </Card>
+                          </Grid>
+                        ))}
+                      </Grid>
+                    </>
+                  )}
+
                   {/* Students View */}
                   {view === 'students' && (
                     <>
@@ -648,6 +768,50 @@ export default function AdminPanel() {
             </DialogActions>
           </>
         )}
+      </Dialog>
+
+      {/* Topic Dialog */}
+      <Dialog open={topicDialogOpen} onClose={() => setTopicDialogOpen(false)} maxWidth="xs" fullWidth PaperProps={{ sx: { borderRadius: 4 } }}>
+        <DialogTitle sx={{ fontWeight: 800 }}>{editingTopic ? 'Edit Topic' : 'Add New Topic'}</DialogTitle>
+        <DialogContent dividers>
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.5, pt: 1 }}>
+            <TextField 
+              label="Label (Display Name)" 
+              value={topicForm.label} 
+              onChange={e => setTopicForm({...topicForm, label: e.target.value})} 
+              fullWidth size="small" placeholder="e.g. Pranavaha Srotas"
+            />
+            <TextField 
+              label="Slug (URL identifier)" 
+              value={topicForm.slug} 
+              onChange={e => setTopicForm({...topicForm, slug: e.target.value})} 
+              fullWidth size="small" placeholder="e.g. pranavaha-srotas"
+            />
+            <TextField 
+              label="Icon (Emoji)" 
+              value={topicForm.icon} 
+              onChange={e => setTopicForm({...topicForm, icon: e.target.value})} 
+              fullWidth size="small" placeholder="e.g. 🌬️"
+            />
+            <TextField 
+              label="Description (Short)" 
+              value={topicForm.description} 
+              onChange={e => setTopicForm({...topicForm, description: e.target.value})} 
+              fullWidth size="small" placeholder="e.g. Respiratory channels"
+            />
+            <TextField 
+              label="Sort Order" 
+              type="number"
+              value={topicForm.sort_order} 
+              onChange={e => setTopicForm({...topicForm, sort_order: parseInt(e.target.value) || 0})} 
+              fullWidth size="small"
+            />
+          </Box>
+        </DialogContent>
+        <DialogActions sx={{ p: 3 }}>
+          <Button onClick={() => setTopicDialogOpen(false)}>Cancel</Button>
+          <Button variant="contained" onClick={handleSaveTopic}>{editingTopic ? 'Update' : 'Create'}</Button>
+        </DialogActions>
       </Dialog>
 
       <Snackbar
