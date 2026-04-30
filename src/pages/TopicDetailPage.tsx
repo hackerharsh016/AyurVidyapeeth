@@ -1,3 +1,4 @@
+import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import Box from '@mui/material/Box';
 import Container from '@mui/material/Container';
@@ -6,18 +7,18 @@ import Grid from '@mui/material/Grid';
 import Chip from '@mui/material/Chip';
 import Button from '@mui/material/Button';
 import Paper from '@mui/material/Paper';
-import Divider from '@mui/material/Divider';
 import List from '@mui/material/List';
 import ListItem from '@mui/material/ListItem';
 import ListItemIcon from '@mui/material/ListItemIcon';
 import ListItemText from '@mui/material/ListItemText';
+import CircularProgress from '@mui/material/CircularProgress';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
 import FiberManualRecordIcon from '@mui/icons-material/FiberManualRecord';
 import { motion } from 'framer-motion';
 import PageLayout from '../components/PageLayout';
 import CourseCard from '../components/CourseCard';
-import { directoryEntries } from '../data/directory';
+import { supabase } from '../supabase/supabase';
 import { useCourseStore } from '../stores/courseStore';
 
 const sectionColors: Record<string, string> = {
@@ -28,12 +29,75 @@ const sectionColors: Record<string, string> = {
   Disease: '#DC2626',
 };
 
+interface DirectoryEntry {
+  id: string;
+  type: string;
+  title: string;
+  slug: string;
+  sanskrit_name: string;
+  english_name: string;
+  meaning: string;
+  summary: string;
+  definition: string;
+  introduction: string;
+  etiology: string;
+  synonyms: string[];
+  origin: string;
+  panchabhautikatva: string;
+  swaroop: string;
+  characteristics: string[];
+  types_description: string;
+  sankhya: string;
+  prakar_charak: string;
+  prakar_sushruta: string;
+  moolasthana: string;
+  viddha_lakshan: string;
+  dushti: string;
+  functions: string[];
+  disorders: string[];
+  treatment_principles: string[];
+  related_course_ids: string[];
+}
+
 export default function TopicDetailPage() {
   const { slug } = useParams<{ slug: string }>();
   const navigate = useNavigate();
-  const { courses } = useCourseStore();
+  const { courses, fetchCourses } = useCourseStore();
+  const [entry, setEntry] = useState<DirectoryEntry | null>(null);
+  const [loading, setLoading] = useState(true);
 
-  const entry = directoryEntries.find(e => e.slug === slug);
+  useEffect(() => {
+    const fetchEntry = async () => {
+      setLoading(true);
+      try {
+        const { data, error } = await supabase
+          .from('directory_entries')
+          .select('*')
+          .eq('slug', slug as string)
+          .single();
+        
+        if (error) throw error;
+        setEntry(data as unknown as DirectoryEntry);
+      } catch (err) {
+        console.error('Error fetching topic details:', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    if (slug) fetchEntry();
+    if (courses.length === 0) fetchCourses();
+  }, [slug]);
+
+  if (loading) {
+    return (
+      <PageLayout>
+        <Container sx={{ py: 20, textAlign: 'center' }}>
+          <CircularProgress />
+        </Container>
+      </PageLayout>
+    );
+  }
 
   if (!entry) {
     return (
@@ -47,28 +111,18 @@ export default function TopicDetailPage() {
     );
   }
 
-  const relatedCourses = courses.filter(c => entry.relatedCourseIds.includes(c.id));
-  const accentColor = sectionColors[entry.category] || '#0E5B44';
+  const relatedCourses = courses.filter(c => entry.related_course_ids?.includes(c.id));
+  const accentColor = sectionColors[entry.type] || '#0E5B44';
 
   const tocItems = [
-    entry.introduction ? 'Introduction' : null,
+    'Introduction',
     entry.etiology ? 'Etiology' : null,
-    entry.synonyms ? 'Synonyms' : null,
-    entry.origin ? 'Origin' : null,
-    'Definition',
-    entry.panchabhautikatva ? 'Panchabhautikatva' : null,
-    entry.swaroop ? 'Swaroop' : null,
-    entry.fourCharacteristics ? 'Characteristics' : null,
-    entry.typesDescription ? 'Types' : null,
-    entry.sankhya ? 'Sankhya' : null,
-    entry.prakarCharak ? 'Charak Classification' : null,
-    entry.prakarSushruta ? 'Sushruta Classification' : null,
-    'Mula Sthana & Dushti',
-    'Functions',
-    'Disorders',
-    'Treatment Principles',
-    entry.properties ? 'Properties' : null,
-    'Related Courses',
+    entry.definition ? 'Definition' : null,
+    entry.moolasthana ? 'Moolasthana' : null,
+    entry.functions?.length ? 'Functions' : null,
+    entry.disorders?.length ? 'Disorders' : null,
+    entry.treatment_principles?.length ? 'Treatment' : null,
+    relatedCourses.length ? 'Related Courses' : null,
   ].filter(Boolean) as string[];
 
   return (
@@ -86,7 +140,7 @@ export default function TopicDetailPage() {
             </Button>
 
             <Chip
-              label={entry.category}
+              label={entry.type}
               sx={{
                 bgcolor: 'rgba(255,255,255,0.2)',
                 color: 'white',
@@ -99,16 +153,18 @@ export default function TopicDetailPage() {
               variant="body2"
               sx={{ color: 'rgba(255,255,255,0.7)', fontFamily: 'serif', fontSize: '1.2rem', mb: 1 }}
             >
-              {entry.sanskritName}
+              {entry.sanskrit_name}
             </Typography>
             <Typography variant="h2" sx={{ color: 'white', fontWeight: 700, mb: 2, fontSize: { xs: '1.8rem', md: '2.5rem' } }}>
-              {entry.englishName}
+              {entry.english_name || entry.title}
             </Typography>
-            <Typography variant="h6" sx={{ color: 'rgba(255,255,255,0.85)', fontWeight: 400, fontStyle: 'italic', mb: 2 }}>
-              "{entry.meaning}"
-            </Typography>
+            {entry.meaning && (
+              <Typography variant="h6" sx={{ color: 'rgba(255,255,255,0.85)', fontWeight: 400, fontStyle: 'italic', mb: 2 }}>
+                "{entry.meaning}"
+              </Typography>
+            )}
             <Typography variant="body1" sx={{ color: 'rgba(255,255,255,0.8)', maxWidth: 700, lineHeight: 1.7 }}>
-              {entry.shortDescription}
+              {entry.summary}
             </Typography>
           </motion.div>
         </Container>
@@ -153,7 +209,7 @@ export default function TopicDetailPage() {
           <Grid size={{ xs: 12, md: 9 }}>
             <Box sx={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
 
-              {/* 1. Introduction */}
+              {/* Introduction */}
               {entry.introduction && (
                 <Section title="Introduction" icon="📜">
                   <Typography variant="body1" color="text.secondary" sx={{ lineHeight: 1.8 }}>
@@ -162,7 +218,7 @@ export default function TopicDetailPage() {
                 </Section>
               )}
 
-              {/* 2. Etiology */}
+              {/* Etiology */}
               {entry.etiology && (
                 <Section title="Etiology (Nidana)" icon="🔬">
                   <Typography variant="body1" color="text.secondary" sx={{ lineHeight: 1.8, whiteSpace: 'pre-line' }}>
@@ -171,8 +227,8 @@ export default function TopicDetailPage() {
                 </Section>
               )}
 
-              {/* 3. Synonyms */}
-              {entry.synonyms && (
+              {/* Synonyms */}
+              {entry.synonyms?.length > 0 && (
                 <Section title="Synonyms (Paryaya)" icon="🏷️">
                   <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
                     {entry.synonyms.map((s, i) => (
@@ -182,7 +238,7 @@ export default function TopicDetailPage() {
                 </Section>
               )}
 
-              {/* 4. Origin */}
+              {/* Origin */}
               {entry.origin && (
                 <Section title="Origin (Utpatti)" icon="🌱">
                   <Typography variant="body1" color="text.secondary" sx={{ lineHeight: 1.8 }}>
@@ -191,14 +247,14 @@ export default function TopicDetailPage() {
                 </Section>
               )}
 
-              {/* 5. Definition */}
+              {/* Definition */}
               <Section title="Definition" icon="📖">
                 <Typography variant="body1" color="text.secondary" sx={{ lineHeight: 1.8 }}>
                   {entry.definition}
                 </Typography>
               </Section>
 
-              {/* 6. Panchabhautikatva */}
+              {/* Panchabhautikatva */}
               {entry.panchabhautikatva && (
                 <Section title="Panchabhautikatva" icon="🌫️">
                   <Box sx={{ p: 2.5, bgcolor: 'rgba(14,91,68,0.03)', borderRadius: 2, border: '1px solid', borderColor: 'divider' }}>
@@ -209,7 +265,7 @@ export default function TopicDetailPage() {
                 </Section>
               )}
 
-              {/* 7. Swaroop */}
+              {/* Swaroop */}
               {entry.swaroop && (
                 <Section title="Swaroop (Appearance)" icon="👁️">
                   <Typography variant="body1" color="text.secondary" sx={{ lineHeight: 1.8, whiteSpace: 'pre-line' }}>
@@ -218,149 +274,92 @@ export default function TopicDetailPage() {
                 </Section>
               )}
 
-              {/* 8. Characteristics */}
-              {entry.fourCharacteristics && (
-                <Section title="Four Characteristics" icon="✨">
-                  <Grid container spacing={2}>
-                    {entry.fourCharacteristics.map((c, i) => (
-                      <Grid key={i} size={{ xs: 6, sm: 3 }}>
-                        <Box sx={{ p: 2, textAlign: 'center', bgcolor: 'white', borderRadius: 2, border: '1px solid', borderColor: 'divider' }}>
-                          <Typography variant="subtitle2" fontWeight={700} color="primary.main">
-                            {c}
-                          </Typography>
-                        </Box>
-                      </Grid>
-                    ))}
-                  </Grid>
-                </Section>
-              )}
-
-              {/* 9. Types */}
-              {entry.typesDescription && (
-                <Section title="Types of Srotas" icon="📂">
-                  <Typography variant="body1" color="text.secondary" sx={{ lineHeight: 1.8, whiteSpace: 'pre-line' }}>
-                    {entry.typesDescription}
-                  </Typography>
-                </Section>
-              )}
-
-              {/* 10. Sankhya */}
-              {entry.sankhya && (
-                <Section title="Srotas Sankhya" icon="🔢">
-                  <Box sx={{ p: 2.5, bgcolor: '#FFFBEB', borderRadius: 2, border: '1px solid #FEF3C7' }}>
-                    <Typography variant="body1" color="#92400E" fontWeight={500}>
-                      {entry.sankhya}
-                    </Typography>
-                  </Box>
-                </Section>
-              )}
-
-              {/* 11 & 12. Classifications */}
-              {(entry.prakarCharak || entry.prakarSushruta) && (
-                <Section title="Classifications" icon="📚">
-                  <Grid container spacing={3}>
-                    {entry.prakarCharak && (
-                      <Grid size={{ xs: 12, md: 6 }}>
-                        <Typography variant="subtitle2" gutterBottom fontWeight={700}>Acharya Charak</Typography>
-                        <Typography variant="body2" color="text.secondary" sx={{ lineHeight: 1.7 }}>
-                          {entry.prakarCharak}
-                        </Typography>
-                      </Grid>
-                    )}
-                    {entry.prakarSushruta && (
-                      <Grid size={{ xs: 12, md: 6 }}>
-                        <Typography variant="subtitle2" gutterBottom fontWeight={700}>Acharya Sushruta</Typography>
-                        <Typography variant="body2" color="text.secondary" sx={{ lineHeight: 1.7 }}>
-                          {entry.prakarSushruta}
-                        </Typography>
-                      </Grid>
-                    )}
-                  </Grid>
-                </Section>
-              )}
-
-              <Divider />
-
-              {/* 13. Mula Sthana, Viddha Lakshan, Dushti */}
-              <Section title="Mula Sthana & Dushti" icon="🎯">
-                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-                  {entry.moolasthana && (
+              {/* Moolasthana */}
+              {entry.moolasthana && (
+                <Section title="Mula Sthana & Dushti" icon="🎯">
+                  <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
                     <Box sx={{ p: 2, bgcolor: '#F0FDF4', borderRadius: 2, border: '1px solid #BBF7D0' }}>
-                      <Typography variant="caption" color="primary.main" fontWeight={700} display="block" gutterBottom uppercase>
+                      <Typography variant="caption" color="primary.main" fontWeight={700} display="block" gutterBottom sx={{ textTransform: 'uppercase' }}>
                         Mula Sthana (Origin)
                       </Typography>
                       <Typography variant="body1" fontWeight={600} color="primary.dark">
                         {entry.moolasthana}
                       </Typography>
                     </Box>
-                  )}
-                  {entry.viddhaLakshan && (
-                    <Box sx={{ p: 2, bgcolor: '#FEF2F2', borderRadius: 2, border: '1px solid #FECACA' }}>
-                      <Typography variant="caption" color="#DC2626" fontWeight={700} display="block" gutterBottom uppercase>
-                        Viddha Lakshan (Injury Symptoms)
-                      </Typography>
-                      <Typography variant="body2" color="#991B1B">
-                        {entry.viddhaLakshan}
-                      </Typography>
-                    </Box>
-                  )}
-                  {entry.dushti && (
-                    <Box sx={{ p: 2, bgcolor: '#F8FAFC', borderRadius: 2, border: '1px solid #E2E8F0' }}>
-                      <Typography variant="caption" color="text.secondary" fontWeight={700} display="block" gutterBottom uppercase>
-                        Dushti (Vitiation Symptoms)
-                      </Typography>
-                      <Typography variant="body2" color="text.primary">
-                        {entry.dushti}
-                      </Typography>
-                    </Box>
-                  )}
-                </Box>
-              </Section>
+                    {entry.viddha_lakshan && (
+                      <Box sx={{ p: 2, bgcolor: '#FEF2F2', borderRadius: 2, border: '1px solid #FECACA' }}>
+                        <Typography variant="caption" color="#DC2626" fontWeight={700} display="block" gutterBottom sx={{ textTransform: 'uppercase' }}>
+                          Viddha Lakshan (Injury Symptoms)
+                        </Typography>
+                        <Typography variant="body2" color="#991B1B">
+                          {entry.viddha_lakshan}
+                        </Typography>
+                      </Box>
+                    )}
+                    {entry.dushti && (
+                      <Box sx={{ p: 2, bgcolor: '#F8FAFC', borderRadius: 2, border: '1px solid #E2E8F0' }}>
+                        <Typography variant="caption" color="text.secondary" fontWeight={700} display="block" gutterBottom sx={{ textTransform: 'uppercase' }}>
+                          Dushti (Vitiation Symptoms)
+                        </Typography>
+                        <Typography variant="body2" color="text.primary">
+                          {entry.dushti}
+                        </Typography>
+                      </Box>
+                    )}
+                  </Box>
+                </Section>
+              )}
 
               {/* Functions */}
-              <Section title="Functions (Karma)" icon="⚙️">
-                <List dense sx={{ p: 0 }}>
-                  {entry.functions.map((fn, i) => (
-                    <ListItem key={i} sx={{ px: 0, py: 0.5 }}>
-                      <ListItemIcon sx={{ minWidth: 32 }}>
-                        <CheckCircleOutlineIcon sx={{ fontSize: 18, color: 'primary.main' }} />
-                      </ListItemIcon>
-                      <ListItemText primary={fn} primaryTypographyProps={{ variant: 'body2', lineHeight: 1.6 }} />
-                    </ListItem>
-                  ))}
-                </List>
-              </Section>
+              {entry.functions?.length > 0 && (
+                <Section title="Functions (Karma)" icon="⚙️">
+                  <List dense sx={{ p: 0 }}>
+                    {entry.functions.map((fn, i) => (
+                      <ListItem key={i} sx={{ px: 0, py: 0.5 }}>
+                        <ListItemIcon sx={{ minWidth: 32 }}>
+                          <CheckCircleOutlineIcon sx={{ fontSize: 18, color: 'primary.main' }} />
+                        </ListItemIcon>
+                        <ListItemText primary={fn} primaryTypographyProps={{ variant: 'body2', lineHeight: 1.6 }} />
+                      </ListItem>
+                    ))}
+                  </List>
+                </Section>
+              )}
 
               {/* Disorders */}
-              <Section title="Associated Disorders (Vikara)" icon="🩺">
-                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
-                  {entry.disorders.map((d, i) => (
-                    <Chip
-                      key={i}
-                      label={d}
-                      sx={{ bgcolor: '#FEF2F2', color: '#DC2626', borderColor: '#FECACA', border: '1px solid' }}
-                    />
-                  ))}
-                </Box>
-              </Section>
+              {entry.disorders?.length > 0 && (
+                <Section title="Associated Disorders (Vikara)" icon="🩺">
+                  <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+                    {entry.disorders.map((d, i) => (
+                      <Chip
+                        key={i}
+                        label={d}
+                        sx={{ bgcolor: '#FEF2F2', color: '#DC2626', borderColor: '#FECACA', border: '1px solid' }}
+                      />
+                    ))}
+                  </Box>
+                </Section>
+              )}
 
               {/* Treatment Principles */}
-              <Section title="Treatment Principles (Chikitsa Sutra)" icon="💊">
-                <List dense sx={{ p: 0 }}>
-                  {entry.treatmentPrinciples.map((t, i) => (
-                    <ListItem key={i} sx={{ px: 0, py: 0.5 }}>
-                      <ListItemIcon sx={{ minWidth: 32 }}>
-                        <Box sx={{ width: 20, height: 20, borderRadius: '50%', bgcolor: '#FEF3C7', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                          <Typography variant="caption" sx={{ fontWeight: 700, color: '#92400E', fontSize: '0.65rem' }}>
-                            {i + 1}
-                          </Typography>
-                        </Box>
-                      </ListItemIcon>
-                      <ListItemText primary={t} primaryTypographyProps={{ variant: 'body2', lineHeight: 1.6 }} />
-                    </ListItem>
-                  ))}
-                </List>
-              </Section>
+              {entry.treatment_principles?.length > 0 && (
+                <Section title="Treatment Principles (Chikitsa Sutra)" icon="💊">
+                  <List dense sx={{ p: 0 }}>
+                    {entry.treatment_principles.map((t, i) => (
+                      <ListItem key={i} sx={{ px: 0, py: 0.5 }}>
+                        <ListItemIcon sx={{ minWidth: 32 }}>
+                          <Box sx={{ width: 20, height: 20, borderRadius: '50%', bgcolor: '#FEF3C7', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                            <Typography variant="caption" sx={{ fontWeight: 700, color: '#92400E', fontSize: '0.65rem' }}>
+                              {i + 1}
+                            </Typography>
+                          </Box>
+                        </ListItemIcon>
+                        <ListItemText primary={t} primaryTypographyProps={{ variant: 'body2', lineHeight: 1.6 }} />
+                      </ListItem>
+                    ))}
+                  </List>
+                </Section>
+              )}
 
               {/* Related Courses */}
               {relatedCourses.length > 0 && (

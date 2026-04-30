@@ -47,7 +47,7 @@ export default function HomePage() {
   const { courses, testimonials } = useCourseStore();
   const [topics, setTopics] = useState<Topic[]>([]);
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const [topicsLoading, setTopicsLoading] = useState(true);
+  const [, setTopicsLoading] = useState(true);
 
   useEffect(() => {
     const fetchTopics = async () => {
