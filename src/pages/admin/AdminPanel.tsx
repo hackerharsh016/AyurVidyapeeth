@@ -284,10 +284,12 @@ export default function AdminPanel() {
     try {
       const { id, ...topicData } = topicForm;
       if (editingTopic && editingTopic.id) {
-        await supabase.from('homepage_topics').update(topicData).eq('id', editingTopic.id);
+        const { error } = await supabase.from('homepage_topics').update(topicData).eq('id', editingTopic.id);
+        if (error) throw error;
         setToast({ open: true, message: 'Topic updated successfully!', severity: 'success' });
       } else {
-        await supabase.from('homepage_topics').insert(topicData);
+        const { error } = await supabase.from('homepage_topics').insert(topicData);
+        if (error) throw error;
         setToast({ open: true, message: 'Topic created successfully!', severity: 'success' });
       }
       setTopicDialogOpen(false);
@@ -300,7 +302,8 @@ export default function AdminPanel() {
   const handleDeleteTopic = async (id: string) => {
     if (!confirm('Are you sure you want to delete this topic?')) return;
     try {
-      await supabase.from('homepage_topics').delete().eq('id', id);
+      const { error } = await supabase.from('homepage_topics').delete().eq('id', id);
+      if (error) throw error;
       setToast({ open: true, message: 'Topic deleted!', severity: 'info' });
       fetchData();
     } catch (err: any) {
@@ -317,7 +320,8 @@ export default function AdminPanel() {
       { label: 'Kapha Dosha', slug: 'kapha-dosha', icon: '🌊', description: 'Structural force', sort_order: 5 },
       { label: 'Ashwagandha', slug: 'ashwagandha', icon: '🌿', description: 'King of herbs', sort_order: 6 },
     ];
-    await supabase.from('homepage_topics').insert(templates);
+    const { error } = await supabase.from('homepage_topics').insert(templates);
+    if (error) throw error;
     setToast({ open: true, message: 'Template topics seeded!', severity: 'success' });
     fetchData();
   };
@@ -335,32 +339,27 @@ export default function AdminPanel() {
   const handleSaveDirectoryEntry = async () => {
     try {
       const {
-        id, type, title, slug, sanskrit_name, summary,
-        ...restContent
+        id,
+        ...rest
       } = directoryForm;
 
       const dataToSave = {
-        type,
-        title,
-        slug,
-        sanskrit_name,
-        summary,
-        content: {
-          ...restContent,
-          // Ensure arrays are handled correctly
-          synonyms: typeof directoryForm.synonyms === 'string' ? (directoryForm.synonyms as string).split(',').map(s => s.trim()) : directoryForm.synonyms,
-          characteristics: typeof directoryForm.characteristics === 'string' ? (directoryForm.characteristics as string).split(',').map(s => s.trim()) : directoryForm.characteristics,
-          functions: typeof directoryForm.functions === 'string' ? (directoryForm.functions as string).split(',').map(s => s.trim()) : directoryForm.functions,
-          disorders: typeof directoryForm.disorders === 'string' ? (directoryForm.disorders as string).split(',').map(s => s.trim()) : directoryForm.disorders,
-          treatment_principles: typeof directoryForm.treatment_principles === 'string' ? (directoryForm.treatment_principles as string).split(',').map(s => s.trim()) : directoryForm.treatment_principles,
-        }
+        ...rest,
+        // Ensure arrays are handled correctly
+        synonyms: typeof directoryForm.synonyms === 'string' ? (directoryForm.synonyms as string).split(',').map(s => s.trim()).filter(Boolean) : (directoryForm.synonyms || []),
+        characteristics: typeof directoryForm.characteristics === 'string' ? (directoryForm.characteristics as string).split(',').map(s => s.trim()).filter(Boolean) : (directoryForm.characteristics || []),
+        functions: typeof directoryForm.functions === 'string' ? (directoryForm.functions as string).split(',').map(s => s.trim()).filter(Boolean) : (directoryForm.functions || []),
+        disorders: typeof directoryForm.disorders === 'string' ? (directoryForm.disorders as string).split(',').map(s => s.trim()).filter(Boolean) : (directoryForm.disorders || []),
+        treatment_principles: typeof directoryForm.treatment_principles === 'string' ? (directoryForm.treatment_principles as string).split(',').map(s => s.trim()).filter(Boolean) : (directoryForm.treatment_principles || []),
       };
 
       if (editingEntry && editingEntry.id) {
-        await supabase.from('directory_entries').update(dataToSave).eq('id', editingEntry.id);
+        const { error } = await supabase.from('directory_entries').update(dataToSave).eq('id', editingEntry.id);
+        if (error) throw error;
         setToast({ open: true, message: 'Entry updated successfully!', severity: 'success' });
       } else {
-        await supabase.from('directory_entries').insert(dataToSave);
+        const { error } = await supabase.from('directory_entries').insert(dataToSave);
+        if (error) throw error;
         setToast({ open: true, message: 'Entry created successfully!', severity: 'success' });
       }
       setDirectoryDialogOpen(false);
@@ -373,7 +372,8 @@ export default function AdminPanel() {
   const handleDeleteEntry = async (id: string) => {
     if (!confirm('Are you sure you want to delete this encyclopedia entry?')) return;
     try {
-      await supabase.from('directory_entries').delete().eq('id', id);
+      const { error } = await supabase.from('directory_entries').delete().eq('id', id);
+      if (error) throw error;
       setToast({ open: true, message: 'Entry deleted!', severity: 'info' });
       fetchData();
     } catch (err: any) {

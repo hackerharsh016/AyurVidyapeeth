@@ -60,7 +60,8 @@ export const useCourseStore = create<CourseState>()((set, get) => ({
             title: l.title,
             duration: l.duration ? `${Math.floor(l.duration / 60)}:${(l.duration % 60).toString().padStart(2, '0')}` : '0:00',
             type: l.video_url ? 'video' : 'pdf',
-            preview: l.is_preview || false
+            preview: l.is_preview || false,
+            videoUrl: l.video_url || undefined
           })).sort((a: any, b: any) => (a.sort_order || 0) - (b.sort_order || 0))
         })).sort((a: any, b: any) => (a.sort_order || 0) - (b.sort_order || 0));
 
@@ -218,7 +219,7 @@ export const useCourseStore = create<CourseState>()((set, get) => ({
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) return;
 
-    await supabase.from('courses').insert({
+    const { data: insertedCourse, error: courseError } = await supabase.from('courses').insert({
       creator_id: session.user.id,
       title: course.title,
       subtitle: course.subtitle,
@@ -231,7 +232,52 @@ export const useCourseStore = create<CourseState>()((set, get) => ({
       what_you_learn: course.whatYouLearn,
       total_lessons: course.totalLessons,
       status: 'pending' // new courses go to pending
-    });
+    }).select('id').single();
+    
+    if (courseError) {
+      console.error('Error inserting course:', courseError);
+      return;
+    }
+
+    const newCourseId = insertedCourse.id;
+
+    // Insert sections and lessons
+    for (let i = 0; i < course.curriculum.length; i++) {
+      const section = course.curriculum[i];
+      const { data: insertedSection, error: sectionError } = await supabase.from('course_sections').insert({
+        course_id: newCourseId,
+        title: section.title,
+        sort_order: i
+      }).select('id').single();
+
+      if (sectionError) {
+        console.error('Error inserting section:', sectionError);
+        continue;
+      }
+
+      const sectionId = insertedSection.id;
+
+      const lessonsToInsert = section.lessons.map((lesson, lIdx) => {
+        let durationSeconds = 600; // default 10 mins
+        if (lesson.duration && lesson.duration.includes(':')) {
+           const parts = lesson.duration.split(':');
+           durationSeconds = (parseInt(parts[0]) || 0) * 60 + (parseInt(parts[1]) || 0);
+        }
+
+        return {
+          section_id: sectionId,
+          title: lesson.title,
+          duration: durationSeconds,
+          is_preview: false,
+          sort_order: lIdx
+        };
+      });
+
+      if (lessonsToInsert.length > 0) {
+        const { error: lessonsError } = await supabase.from('lessons').insert(lessonsToInsert);
+        if (lessonsError) console.error('Error inserting lessons:', lessonsError);
+      }
+    }
     
     await get().fetchCourses();
   },

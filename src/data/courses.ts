@@ -4,6 +4,7 @@ export interface Lesson {
   duration: string;
   type: 'video' | 'pdf' | 'quiz';
   preview?: boolean;
+  videoUrl?: string;
 }
 
 export interface Section {

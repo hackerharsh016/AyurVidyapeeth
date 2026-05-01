@@ -282,8 +282,8 @@ export default function CreatorDashboard() {
                           <Button size="small" variant="outlined" onClick={() => navigate(`/courses/${course.id}`)}>
                             View
                           </Button>
-                          <Button size="small" variant="contained" color="primary" onClick={() => navigate('/creator/upload')}>
-                            Edit
+                          <Button size="small" variant="contained" color="primary" onClick={() => navigate(`/creator/manage/${course.id}`)}>
+                            Manage Content
                           </Button>
                         </Box>
                       </Box>

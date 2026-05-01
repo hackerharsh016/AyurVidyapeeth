@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import Box from '@mui/material/Box';
 import Container from '@mui/material/Container';
@@ -42,6 +42,7 @@ export default function VideoPlayerPage() {
   const { markComplete, isCompleted, getCourseProgress, setCurrentLesson, getCurrentLesson } = useProgressStore();
 
   const [activeLesson, setActiveLesson] = useState<Lesson | null>(null);
+  const videoRef = useRef<HTMLVideoElement>(null);
   const [activeSectionId, setActiveSectionId] = useState('');
   const [playing, setPlaying] = useState(false);
   const [fakeProgress, setFakeProgress] = useState(0);
@@ -78,21 +79,39 @@ export default function VideoPlayerPage() {
   }, [course, courseId, getCurrentLesson]);
 
   useEffect(() => {
-    let interval: ReturnType<typeof setInterval>;
-    if (playing && fakeProgress < 100) {
-      interval = setInterval(() => {
-        setFakeProgress(p => {
-          if (p >= 100) {
-            setPlaying(false);
-            clearInterval(interval);
-            return 100;
-          }
-          return p + speed * 0.5;
-        });
-      }, 300);
+    if (videoRef.current) {
+      if (playing) {
+        videoRef.current.play().catch(e => console.error('Video play error:', e));
+      } else {
+        videoRef.current.pause();
+      }
     }
-    return () => clearInterval(interval);
-  }, [playing, fakeProgress, speed]);
+  }, [playing, activeLesson]);
+
+  useEffect(() => {
+    if (videoRef.current) {
+      videoRef.current.playbackRate = speed;
+    }
+  }, [speed]);
+
+  const handleTimeUpdate = () => {
+    if (videoRef.current) {
+      const p = (videoRef.current.currentTime / videoRef.current.duration) * 100;
+      setFakeProgress(p || 0);
+    }
+  };
+
+  const handleEnded = () => {
+    setPlaying(false);
+    handleMarkComplete();
+  };
+
+  const formatTime = (seconds: number) => {
+    if (isNaN(seconds)) return '0:00';
+    const m = Math.floor(seconds / 60);
+    const s = Math.floor(seconds % 60);
+    return `${m}:${s.toString().padStart(2, '0')}`;
+  };
 
   if (!course) {
     return (
@@ -168,7 +187,7 @@ export default function VideoPlayerPage() {
         <Grid container sx={{ minHeight: 'calc(100vh - 120px)' }}>
           {/* Video Area */}
           <Grid size={{ xs: 12, md: 8 }}>
-            {/* Fake Video Player */}
+            {/* Real Video Player */}
             <Box
               sx={{
                 bgcolor: '#000',
@@ -178,85 +197,32 @@ export default function VideoPlayerPage() {
                 flexDirection: 'column',
                 alignItems: 'center',
                 justifyContent: 'center',
-                cursor: 'pointer',
+                overflow: 'hidden'
               }}
-              onClick={() => setPlaying(p => !p)}
             >
-              {/* Background gradient */}
-              <Box sx={{ position: 'absolute', inset: 0, background: 'linear-gradient(135deg, #0E5B44 0%, #093D2E 100%)', opacity: 0.8 }} />
-              <Box sx={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 2, zIndex: 1 }}>
-                <Typography sx={{ fontSize: '3rem' }}>🌿</Typography>
-                <Typography variant="h6" sx={{ color: 'white', textAlign: 'center', fontWeight: 600, px: 3 }}>
-                  {activeLesson?.title}
-                </Typography>
-                <motion.div animate={{ scale: playing ? 0.9 : 1 }} transition={{ repeat: playing ? Infinity : 0, repeatType: 'reverse', duration: 0.8 }}>
-                  <Box
-                    sx={{
-                      width: 64,
-                      height: 64,
-                      borderRadius: '50%',
-                      bgcolor: 'rgba(255,255,255,0.2)',
-                      border: '2px solid rgba(255,255,255,0.5)',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      cursor: 'pointer',
-                      backdropFilter: 'blur(10px)',
-                    }}
-                  >
-                    <Typography sx={{ fontSize: '1.8rem', ml: playing ? 0 : 0.5 }}>
-                      {playing ? '⏸' : '▶'}
-                    </Typography>
-                  </Box>
-                </motion.div>
-                {playing && (
-                  <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.7)' }}>
-                    Click to pause
-                  </Typography>
-                )}
-              </Box>
-
-              {/* Progress bar on video */}
-              <Box sx={{ position: 'absolute', bottom: 0, left: 0, right: 0, p: 1.5, zIndex: 2 }}>
-                <LinearProgress
-                  variant="determinate"
-                  value={fakeProgress}
-                  sx={{
-                    height: 3,
-                    bgcolor: 'rgba(255,255,255,0.2)',
-                    '& .MuiLinearProgress-bar': { bgcolor: '#D4A017' },
-                  }}
+              {activeLesson?.videoUrl ? (
+                <video
+                  ref={videoRef}
+                  src={activeLesson.videoUrl}
+                  style={{ width: '100%', height: '100%', objectFit: 'contain' }}
+                  onTimeUpdate={handleTimeUpdate}
+                  onEnded={handleEnded}
+                  onPlay={() => setPlaying(true)}
+                  onPause={() => setPlaying(false)}
+                  controls
+                  controlsList="nodownload"
                 />
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 0.5 }}>
-                  <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.6)' }}>
-                    {Math.round(fakeProgress / 100 * 12)}:30 / {activeLesson?.duration}
+              ) : (
+                <Box sx={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 2, zIndex: 1, background: 'linear-gradient(135deg, #0E5B44 0%, #093D2E 100%)' }}>
+                  <Typography sx={{ fontSize: '3rem' }}>🌿</Typography>
+                  <Typography variant="h6" sx={{ color: 'white', textAlign: 'center', fontWeight: 600, px: 3 }}>
+                    {activeLesson?.title}
                   </Typography>
-                  <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
-                    <SpeedIcon sx={{ fontSize: 14, color: 'rgba(255,255,255,0.6)' }} />
-                    <Box sx={{ display: 'flex', gap: 0.5 }}>
-                      {[0.75, 1, 1.25, 1.5, 2].map(s => (
-                        <Box
-                          key={s}
-                          onClick={e => { e.stopPropagation(); setSpeed(s); }}
-                          sx={{
-                            px: 0.75,
-                            py: 0.25,
-                            borderRadius: 0.5,
-                            bgcolor: speed === s ? '#D4A017' : 'rgba(255,255,255,0.1)',
-                            color: 'white',
-                            fontSize: '0.6rem',
-                            cursor: 'pointer',
-                            fontWeight: speed === s ? 700 : 400,
-                          }}
-                        >
-                          {s}x
-                        </Box>
-                      ))}
-                    </Box>
-                  </Box>
+                  <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.7)' }}>No Video Available</Typography>
                 </Box>
-              </Box>
+              )}
             </Box>
+
 
             {/* Controls Below Video */}
             <Box sx={{ bgcolor: '#111827', p: 2, borderBottom: '1px solid rgba(255,255,255,0.08)' }}>

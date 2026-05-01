@@ -20,6 +20,7 @@ import TopicDetailPage from './pages/TopicDetailPage';
 import CreatorDashboard from './pages/creator/CreatorDashboard';
 import UploadCoursePage from './pages/creator/UploadCoursePage';
 import AdminPanel from './pages/admin/AdminPanel';
+import ManageCurriculumPage from './pages/creator/ManageCurriculumPage';
 
 const pageVariants = {
   initial: { opacity: 0, y: 8 },
@@ -52,6 +53,7 @@ function AnimatedRoutes() {
           <Route path="/profile/:id" element={<ProfilePage />} />
           <Route path="/creator" element={<CreatorDashboard />} />
           <Route path="/creator/upload" element={<UploadCoursePage />} />
+          <Route path="/creator/manage/:id" element={<ManageCurriculumPage />} />
           <Route path="/admin" element={<AdminPanel />} />
         </Routes>
       </motion.div>

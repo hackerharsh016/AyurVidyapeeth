@@ -113,64 +113,97 @@ export type Database = {
       }
       directory_entries: {
         Row: {
+          characteristics: string[] | null
           content: Json | null
           created_at: string | null
+          definition: string | null
+          disorders: string[] | null
+          dushti: string | null
+          english_name: string | null
+          etiology: string | null
+          functions: string[] | null
           id: string
+          introduction: string | null
+          meaning: string | null
+          moolasthana: string | null
+          origin: string | null
+          panchabhautikatva: string | null
+          prakar_charak: string | null
+          prakar_sushruta: string | null
+          related_course_ids: string[] | null
+          sankhya: string | null
           sanskrit_name: string | null
           slug: string | null
           summary: string | null
+          swaroop: string | null
+          synonyms: string[] | null
           title: string | null
+          treatment_principles: string[] | null
           type: string | null
+          types_description: string | null
+          viddha_lakshan: string | null
         }
         Insert: {
+          characteristics?: string[] | null
           content?: Json | null
           created_at?: string | null
+          definition?: string | null
+          disorders?: string[] | null
+          dushti?: string | null
+          english_name?: string | null
+          etiology?: string | null
+          functions?: string[] | null
           id?: string
+          introduction?: string | null
+          meaning?: string | null
+          moolasthana?: string | null
+          origin?: string | null
+          panchabhautikatva?: string | null
+          prakar_charak?: string | null
+          prakar_sushruta?: string | null
+          related_course_ids?: string[] | null
+          sankhya?: string | null
           sanskrit_name?: string | null
           slug?: string | null
           summary?: string | null
+          swaroop?: string | null
+          synonyms?: string[] | null
           title?: string | null
+          treatment_principles?: string[] | null
           type?: string | null
+          types_description?: string | null
+          viddha_lakshan?: string | null
         }
         Update: {
+          characteristics?: string[] | null
           content?: Json | null
           created_at?: string | null
+          definition?: string | null
+          disorders?: string[] | null
+          dushti?: string | null
+          english_name?: string | null
+          etiology?: string | null
+          functions?: string[] | null
           id?: string
+          introduction?: string | null
+          meaning?: string | null
+          moolasthana?: string | null
+          origin?: string | null
+          panchabhautikatva?: string | null
+          prakar_charak?: string | null
+          prakar_sushruta?: string | null
+          related_course_ids?: string[] | null
+          sankhya?: string | null
           sanskrit_name?: string | null
           slug?: string | null
           summary?: string | null
+          swaroop?: string | null
+          synonyms?: string[] | null
           title?: string | null
+          treatment_principles?: string[] | null
           type?: string | null
-        }
-        Relationships: []
-      }
-      homepage_topics: {
-        Row: {
-          created_at: string | null
-          description: string | null
-          icon: string | null
-          id: string
-          label: string
-          slug: string
-          sort_order: number | null
-        }
-        Insert: {
-          created_at?: string | null
-          description?: string | null
-          icon?: string | null
-          id?: string
-          label: string
-          slug: string
-          sort_order?: number | null
-        }
-        Update: {
-          created_at?: string | null
-          description?: string | null
-          icon?: string | null
-          id?: string
-          label?: string
-          slug?: string
-          sort_order?: number | null
+          types_description?: string | null
+          viddha_lakshan?: string | null
         }
         Relationships: []
       }
@@ -212,6 +245,36 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      homepage_topics: {
+        Row: {
+          created_at: string | null
+          description: string | null
+          icon: string | null
+          id: string
+          label: string
+          slug: string
+          sort_order: number | null
+        }
+        Insert: {
+          created_at?: string | null
+          description?: string | null
+          icon?: string | null
+          id?: string
+          label: string
+          slug: string
+          sort_order?: number | null
+        }
+        Update: {
+          created_at?: string | null
+          description?: string | null
+          icon?: string | null
+          id?: string
+          label?: string
+          slug?: string
+          sort_order?: number | null
+        }
+        Relationships: []
       }
       lessons: {
         Row: {
@@ -406,7 +469,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      is_admin: { Args: never; Returns: boolean }
     }
     Enums: {
       [_ in never]: never
