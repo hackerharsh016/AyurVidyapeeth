@@ -23,6 +23,7 @@ import AuthModal from './AuthModal';
 const navLinks = [
   { label: 'Home', path: '/' },
   { label: 'Directory', path: '/directory' },
+  { label: 'Resources', path: '/resources' },
   { label: 'Courses', path: '/courses' },
   { label: 'Learning', path: '/learning' },
 ];

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import Box from '@mui/material/Box';
 import Container from '@mui/material/Container';
 import Typography from '@mui/material/Typography';
@@ -45,6 +45,8 @@ import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
 import AddIcon from '@mui/icons-material/Add';
 import WebIcon from '@mui/icons-material/Web';
+import PictureAsPdfIcon from '@mui/icons-material/PictureAsPdf';
+import LinearProgress from '@mui/material/LinearProgress';
 
 import { motion, AnimatePresence } from 'framer-motion';
 import PageLayout from '../../components/PageLayout';
@@ -70,6 +72,9 @@ interface Topic {
   icon: string | null;
   description: string | null;
   sort_order: number | null;
+  subtitle: string | null;
+  year: string | null;
+  pdf_url: string | null;
   created_at?: string | null;
 }
 
@@ -144,7 +149,10 @@ export default function AdminPanel() {
   const [homepageTopics, setHomepageTopics] = useState<Topic[]>([]);
   const [topicDialogOpen, setTopicDialogOpen] = useState(false);
   const [editingTopic, setEditingTopic] = useState<Topic | null>(null);
-  const [topicForm, setTopicForm] = useState<Topic>({ label: '', slug: '', icon: '', description: '', sort_order: 0 });
+  const [topicForm, setTopicForm] = useState<Topic>({ label: '', slug: '', icon: '📄', description: '', sort_order: 0, subtitle: '', year: '', pdf_url: null });
+  const [pdfFile, setPdfFile] = useState<File | null>(null);
+  const [pdfUploading, setPdfUploading] = useState(false);
+  const pdfInputRef = useRef<HTMLInputElement | null>(null);
 
   // Directory entries state
   const [directoryEntries, setDirectoryEntries] = useState<DirectoryEntry[]>([]);
@@ -282,20 +290,40 @@ export default function AdminPanel() {
   // Topic management
   const handleSaveTopic = async () => {
     try {
-      const { id, ...topicData } = topicForm;
+      setPdfUploading(true);
+      let pdfUrl = topicForm.pdf_url;
+
+      // Upload PDF if a new file was selected
+      if (pdfFile) {
+        const fileExt = pdfFile.name.split('.').pop();
+        const fileName = `${topicForm.slug || Date.now()}_${Date.now()}.${fileExt}`;
+        const { error: uploadError } = await supabase.storage
+          .from('topic_pdfs')
+          .upload(fileName, pdfFile, { cacheControl: '3600', upsert: true });
+        if (uploadError) throw uploadError;
+        const { data: { publicUrl } } = supabase.storage.from('topic_pdfs').getPublicUrl(fileName);
+        pdfUrl = publicUrl;
+      }
+
+      const { id, created_at, ...topicData } = topicForm;
+      const dataToSave = { ...topicData, pdf_url: pdfUrl };
+
       if (editingTopic && editingTopic.id) {
-        const { error } = await supabase.from('homepage_topics').update(topicData).eq('id', editingTopic.id);
+        const { error } = await supabase.from('homepage_topics').update(dataToSave).eq('id', editingTopic.id);
         if (error) throw error;
         setToast({ open: true, message: 'Topic updated successfully!', severity: 'success' });
       } else {
-        const { error } = await supabase.from('homepage_topics').insert(topicData);
+        const { error } = await supabase.from('homepage_topics').insert(dataToSave);
         if (error) throw error;
         setToast({ open: true, message: 'Topic created successfully!', severity: 'success' });
       }
       setTopicDialogOpen(false);
+      setPdfFile(null);
       fetchData();
     } catch (err: any) {
       setToast({ open: true, message: `Failed: ${err.message}`, severity: 'error' });
+    } finally {
+      setPdfUploading(false);
     }
   };
 
@@ -313,12 +341,9 @@ export default function AdminPanel() {
 
   const seedTopics = async () => {
     const templates = [
-      { label: 'Pranavaha Srotas', slug: 'pranavaha-srotas', icon: '💨', description: 'Respiratory channels', sort_order: 1 },
-      { label: 'Rasavaha Srotas', slug: 'rasavaha-srotas', icon: '💧', description: 'Nutritive channels', sort_order: 2 },
-      { label: 'Vata Dosha', slug: 'vata-dosha', icon: '🌬️', description: 'Kinetic force', sort_order: 3 },
-      { label: 'Pitta Dosha', slug: 'pitta-dosha', icon: '🔥', description: 'Metabolic force', sort_order: 4 },
-      { label: 'Kapha Dosha', slug: 'kapha-dosha', icon: '🌊', description: 'Structural force', sort_order: 5 },
-      { label: 'Ashwagandha', slug: 'ashwagandha', icon: '🌿', description: 'King of herbs', sort_order: 6 },
+      { label: 'Kriya Sharir Notes', slug: 'kriya-sharir-notes', icon: '📄', description: 'Physiology study material', sort_order: 1, subtitle: 'Complete BAMS Physiology', year: '2025' },
+      { label: 'Rachana Sharir Notes', slug: 'rachana-sharir-notes', icon: '📄', description: 'Anatomy study material', sort_order: 2, subtitle: 'Detailed Anatomy Reference', year: '2025' },
+      { label: 'Dravyaguna Notes', slug: 'dravyaguna-notes', icon: '📄', description: 'Pharmacology study material', sort_order: 3, subtitle: 'Herbal Drug Reference', year: '2024' },
     ];
     const { error } = await supabase.from('homepage_topics').insert(templates);
     if (error) throw error;
@@ -649,7 +674,8 @@ export default function AdminPanel() {
                             startIcon={<AddIcon />} 
                             onClick={() => {
                               setEditingTopic(null);
-                              setTopicForm({ label: '', slug: '', icon: '', description: '', sort_order: homepageTopics.length + 1 });
+                              setPdfFile(null);
+                              setTopicForm({ label: '', slug: '', icon: '📄', description: '', sort_order: homepageTopics.length + 1, subtitle: '', year: '', pdf_url: null });
                               setTopicDialogOpen(true);
                             }}
                           >
@@ -663,17 +689,23 @@ export default function AdminPanel() {
                         {homepageTopics.map((topic) => (
                           <Grid key={topic.id} size={{ xs: 12, sm: 6, md: 4 }}>
                             <Card elevation={0} sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 3 }}>
-                              <CardContent sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
-                                <Box sx={{ fontSize: '2rem' }}>{topic.icon}</Box>
-                                <Box sx={{ flex: 1 }}>
-                                  <Typography variant="subtitle1" fontWeight={700}>{topic.label}</Typography>
-                                  <Typography variant="caption" color="text.secondary" noWrap display="block">slug: {topic.slug}</Typography>
-                                  <Typography variant="caption" color="text.secondary" noWrap display="block">{topic.description}</Typography>
+                              <CardContent sx={{ display: 'flex', gap: 2, alignItems: 'flex-start' }}>
+                                <Box sx={{ width: 44, height: 44, borderRadius: 2, bgcolor: topic.pdf_url ? 'rgba(220,38,38,0.1)' : 'rgba(14,91,68,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                                  <PictureAsPdfIcon sx={{ color: topic.pdf_url ? '#DC2626' : 'text.secondary' }} />
                                 </Box>
-                                <Box>
+                                <Box sx={{ flex: 1, minWidth: 0 }}>
+                                  <Typography variant="subtitle1" fontWeight={700} noWrap>{topic.label}</Typography>
+                                  {topic.subtitle && <Typography variant="caption" color="text.secondary" display="block" noWrap>{topic.subtitle}</Typography>}
+                                  <Box sx={{ display: 'flex', gap: 1, mt: 0.5 }}>
+                                    {topic.year && <Chip label={topic.year} size="small" variant="outlined" sx={{ height: 20, fontSize: '0.65rem' }} />}
+                                    <Chip label={topic.pdf_url ? 'PDF Attached' : 'No PDF'} size="small" sx={{ height: 20, fontSize: '0.65rem', bgcolor: topic.pdf_url ? '#D1FAE5' : '#FEF3C7', color: topic.pdf_url ? '#065F46' : '#92400E' }} />
+                                  </Box>
+                                </Box>
+                                <Box sx={{ display: 'flex', flexDirection: 'column' }}>
                                   <IconButton size="small" onClick={() => {
                                     setEditingTopic(topic);
                                     setTopicForm(topic);
+                                    setPdfFile(null);
                                     setTopicDialogOpen(true);
                                   }}><EditIcon fontSize="small" /></IconButton>
                                   <IconButton size="small" color="error" onClick={() => topic.id && handleDeleteTopic(topic.id)}><DeleteIcon fontSize="small" /></IconButton>
@@ -951,46 +983,74 @@ export default function AdminPanel() {
       </Dialog>
 
       {/* Topic Dialog */}
-      <Dialog open={topicDialogOpen} onClose={() => setTopicDialogOpen(false)} maxWidth="xs" fullWidth PaperProps={{ sx: { borderRadius: 4 } }}>
-        <DialogTitle sx={{ fontWeight: 800 }}>{editingTopic ? 'Edit Topic' : 'Add New Topic'}</DialogTitle>
+      <Dialog open={topicDialogOpen} onClose={() => setTopicDialogOpen(false)} maxWidth="sm" fullWidth PaperProps={{ sx: { borderRadius: 4 } }}>
+        <DialogTitle sx={{ fontWeight: 800 }}>{editingTopic ? 'Edit Study Material' : 'Add New Study Material'}</DialogTitle>
         <DialogContent dividers>
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.5, pt: 1 }}>
             <TextField 
-              label="Label (Display Name)" 
+              label="Title" 
               value={topicForm.label} 
-              onChange={e => setTopicForm({...topicForm, label: e.target.value})} 
-              fullWidth size="small" placeholder="e.g. Pranavaha Srotas"
+              onChange={e => {
+                const label = e.target.value;
+                const slug = label.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+                setTopicForm({...topicForm, label, slug });
+              }} 
+              fullWidth size="small" placeholder="e.g. Kriya Sharir Complete Notes"
             />
             <TextField 
-              label="Slug (URL identifier)" 
-              value={topicForm.slug} 
-              onChange={e => setTopicForm({...topicForm, slug: e.target.value})} 
-              fullWidth size="small" placeholder="e.g. pranavaha-srotas"
+              label="Subtitle" 
+              value={topicForm.subtitle || ''} 
+              onChange={e => setTopicForm({...topicForm, subtitle: e.target.value})} 
+              fullWidth size="small" placeholder="e.g. BAMS 1st Year Physiology"
             />
             <TextField 
-              label="Icon (Emoji)" 
-              value={topicForm.icon} 
-              onChange={e => setTopicForm({...topicForm, icon: e.target.value})} 
-              fullWidth size="small" placeholder="e.g. 🌬️"
+              label="Year" 
+              value={topicForm.year || ''} 
+              onChange={e => setTopicForm({...topicForm, year: e.target.value})} 
+              fullWidth size="small" placeholder="e.g. 2025"
             />
-            <TextField 
-              label="Description (Short)" 
-              value={topicForm.description} 
-              onChange={e => setTopicForm({...topicForm, description: e.target.value})} 
-              fullWidth size="small" placeholder="e.g. Respiratory channels"
-            />
-            <TextField 
-              label="Sort Order" 
-              type="number"
-              value={topicForm.sort_order} 
-              onChange={e => setTopicForm({...topicForm, sort_order: parseInt(e.target.value) || 0})} 
-              fullWidth size="small"
-            />
+
+            {/* PDF Upload */}
+            <Box>
+              <input
+                type="file"
+                accept="application/pdf"
+                style={{ display: 'none' }}
+                ref={pdfInputRef}
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) setPdfFile(file);
+                }}
+              />
+              <Box sx={{ border: '2px dashed', borderColor: pdfFile || topicForm.pdf_url ? 'success.main' : 'divider', borderRadius: 3, p: 3, textAlign: 'center', cursor: 'pointer', transition: 'all 0.2s', '&:hover': { borderColor: 'primary.main', bgcolor: 'rgba(14,91,68,0.02)' } }} onClick={() => pdfInputRef.current?.click()}>
+                <PictureAsPdfIcon sx={{ fontSize: 40, color: pdfFile || topicForm.pdf_url ? '#DC2626' : 'text.disabled', mb: 1 }} />
+                {pdfFile ? (
+                  <>
+                    <Typography variant="body2" fontWeight={600} color="success.main">New file selected</Typography>
+                    <Typography variant="caption" color="text.secondary">{pdfFile.name} ({(pdfFile.size / 1024 / 1024).toFixed(1)} MB)</Typography>
+                  </>
+                ) : topicForm.pdf_url ? (
+                  <>
+                    <Typography variant="body2" fontWeight={600} color="success.main">PDF already uploaded</Typography>
+                    <Typography variant="caption" color="text.secondary">Click to replace with a new file</Typography>
+                  </>
+                ) : (
+                  <>
+                    <Typography variant="body2" fontWeight={600}>Click to upload PDF</Typography>
+                    <Typography variant="caption" color="text.secondary">Supported: PDF files up to 50MB</Typography>
+                  </>
+                )}
+              </Box>
+            </Box>
+
+            {pdfUploading && <LinearProgress sx={{ borderRadius: 2 }} />}
           </Box>
         </DialogContent>
         <DialogActions sx={{ p: 3 }}>
-          <Button onClick={() => setTopicDialogOpen(false)}>Cancel</Button>
-          <Button variant="contained" onClick={handleSaveTopic}>{editingTopic ? 'Update' : 'Create'}</Button>
+          <Button onClick={() => { setTopicDialogOpen(false); setPdfFile(null); }}>Cancel</Button>
+          <Button variant="contained" onClick={handleSaveTopic} disabled={pdfUploading || !topicForm.label}>
+            {pdfUploading ? 'Uploading...' : editingTopic ? 'Update' : 'Create'}
+          </Button>
         </DialogActions>
       </Dialog>
 

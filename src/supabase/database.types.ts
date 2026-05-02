@@ -253,8 +253,11 @@ export type Database = {
           icon: string | null
           id: string
           label: string
+          pdf_url: string | null
           slug: string
           sort_order: number | null
+          subtitle: string | null
+          year: string | null
         }
         Insert: {
           created_at?: string | null
@@ -262,8 +265,11 @@ export type Database = {
           icon?: string | null
           id?: string
           label: string
+          pdf_url?: string | null
           slug: string
           sort_order?: number | null
+          subtitle?: string | null
+          year?: string | null
         }
         Update: {
           created_at?: string | null
@@ -271,8 +277,11 @@ export type Database = {
           icon?: string | null
           id?: string
           label?: string
+          pdf_url?: string | null
           slug?: string
           sort_order?: number | null
+          subtitle?: string | null
+          year?: string | null
         }
         Relationships: []
       }

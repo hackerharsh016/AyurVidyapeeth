@@ -10,6 +10,8 @@ import CardContent from '@mui/material/CardContent';
 import Avatar from '@mui/material/Avatar';
 import Chip from '@mui/material/Chip';
 import Rating from '@mui/material/Rating';
+import PictureAsPdfIcon from '@mui/icons-material/PictureAsPdf';
+import CalendarTodayIcon from '@mui/icons-material/CalendarToday';
 import { motion, useInView } from 'framer-motion';
 import { useRef } from 'react';
 import PageLayout from '../components/PageLayout';
@@ -24,6 +26,9 @@ interface Topic {
   icon: string | null;
   description: string | null;
   sort_order: number | null;
+  subtitle: string | null;
+  year: string | null;
+  pdf_url: string | null;
   created_at: string | null;
 }
 
@@ -46,8 +51,6 @@ export default function HomePage() {
   const navigate = useNavigate();
   const { courses, testimonials } = useCourseStore();
   const [topics, setTopics] = useState<Topic[]>([]);
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const [, setTopicsLoading] = useState(true);
 
   useEffect(() => {
     const fetchTopics = async () => {
@@ -56,44 +59,9 @@ export default function HomePage() {
         .select('*')
         .order('sort_order', { ascending: true });
       
-      if (data && data.length > 0) {
+      if (data) {
         setTopics(data);
-      } else {
-        // Fallback to template data if DB is empty
-        setTopics([
-          {
-            id: '1', label: 'Pranavaha Srotas', slug: 'pranavaha-srotas', icon: '💨', description: 'Respiratory channels',
-            sort_order: null,
-            created_at: null
-          },
-          {
-            id: '2', label: 'Rasavaha Srotas', slug: 'rasavaha-srotas', icon: '💧', description: 'Nutritive channels',
-            sort_order: null,
-            created_at: null
-          },
-          {
-            id: '3', label: 'Vata Dosha', slug: 'vata-dosha', icon: '🌬️', description: 'Kinetic force',
-            sort_order: null,
-            created_at: null
-          },
-          {
-            id: '4', label: 'Pitta Dosha', slug: 'pitta-dosha', icon: '🔥', description: 'Metabolic force',
-            sort_order: null,
-            created_at: null
-          },
-          {
-            id: '5', label: 'Kapha Dosha', slug: 'kapha-dosha', icon: '🌊', description: 'Structural force',
-            sort_order: null,
-            created_at: null
-          },
-          {
-            id: '6', label: 'Ashwagandha', slug: 'ashwagandha', icon: '🌿', description: 'King of herbs',
-            sort_order: null,
-            created_at: null
-          },
-        ]);
       }
-      setTopicsLoading(false);
     };
     fetchTopics();
   }, []);
@@ -285,52 +253,141 @@ export default function HomePage() {
         </Container>
       </Box>
 
-      {/* Popular Topics */}
+      {/* Study Materials / PDF Topics */}
       <Box sx={{ bgcolor: '#F5E8C7', py: { xs: 6, md: 8 } }}>
         <Container maxWidth="lg">
           <FadeInSection>
             <Box sx={{ textAlign: 'center', mb: 4 }}>
               <Typography variant="overline" sx={{ color: 'primary.main', fontWeight: 700, letterSpacing: 2 }}>
-                Explore Topics
+                Study Materials
               </Typography>
               <Typography variant="h4" sx={{ fontWeight: 700, mt: 0.5 }}>
-                Popular Ayurveda Topics
+                Explore Ayurveda Resources
+              </Typography>
+              <Typography variant="body2" color="text.secondary" sx={{ mt: 1, maxWidth: 500, mx: 'auto' }}>
+                Access curated study notes, references, and subject-wise PDFs for your BAMS preparation.
               </Typography>
             </Box>
           </FadeInSection>
-          <Grid container spacing={2}>
-            {topics.map((topic, i) => (
-              <Grid key={topic.slug} size={{ xs: 6, sm: 4, md: 2 }}>
-                <FadeInSection delay={i * 0.08}>
-                  <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.98 }}>
-                    <Card
-                      onClick={() => navigate(`/topic/${topic.slug}`)}
-                      sx={{
-                        cursor: 'pointer',
-                        textAlign: 'center',
-                        p: 2,
-                        height: '100%',
-                        border: '2px solid transparent',
-                        '&:hover': {
-                          border: '2px solid',
-                          borderColor: 'primary.main',
-                          bgcolor: 'rgba(14,91,68,0.04)',
-                        },
-                      }}
-                    >
-                      <Typography sx={{ fontSize: '2rem', mb: 1 }}>{topic.icon}</Typography>
-                      <Typography variant="subtitle2" fontWeight={600} sx={{ lineHeight: 1.3, fontSize: '0.8rem' }}>
-                        {topic.label}
-                      </Typography>
-                      <Typography variant="caption" color="text.secondary">
-                        {topic.description}
-                      </Typography>
-                    </Card>
-                  </motion.div>
-                </FadeInSection>
-              </Grid>
-            ))}
-          </Grid>
+
+          {topics.length === 0 ? (
+            <Box sx={{ textAlign: 'center', py: 6, opacity: 0.5 }}>
+              <PictureAsPdfIcon sx={{ fontSize: 48, mb: 1 }} />
+              <Typography variant="h6" color="text.secondary">No study materials available yet.</Typography>
+            </Box>
+          ) : (
+            <Grid container spacing={3}>
+              {topics.slice(0, 5).map((topic, i) => (
+                <Grid key={topic.id} size={{ xs: 12, sm: 6, md: 4 }}>
+                  <FadeInSection delay={i * 0.08}>
+                    <motion.div whileHover={{ scale: 1.03, y: -4 }} whileTap={{ scale: 0.98 }} style={{ height: '100%' }}>
+                      <Card
+                        onClick={() => {
+                          if (topic.pdf_url) {
+                            navigate(`/topic/${topic.slug}`);
+                          }
+                        }}
+                        sx={{
+                          cursor: topic.pdf_url ? 'pointer' : 'default',
+                          borderRadius: 4,
+                          overflow: 'hidden',
+                          height: '100%',
+                          border: '1px solid',
+                          borderColor: 'divider',
+                          transition: 'all 0.3s ease',
+                          opacity: topic.pdf_url ? 1 : 0.6,
+                          display: 'flex',
+                          flexDirection: 'column',
+                          '&:hover': topic.pdf_url ? {
+                            borderColor: 'primary.main',
+                            boxShadow: '0 12px 32px rgba(14,91,68,0.15)',
+                          } : {},
+                        }}
+                      >
+                        {/* Card Top Accent */}
+                        <Box sx={{ height: 6, background: topic.pdf_url ? 'linear-gradient(90deg, #0E5B44, #D4A017)' : '#ccc' }} />
+                        <CardContent sx={{ p: 3, flexGrow: 1, display: 'flex', flexDirection: 'column' }}>
+                          <Box sx={{ display: 'flex', gap: 2, alignItems: 'flex-start', mb: 'auto' }}>
+                            <Box sx={{
+                              width: 52, height: 52, borderRadius: 3,
+                              bgcolor: topic.pdf_url ? 'rgba(220,38,38,0.08)' : 'grey.100',
+                              display: 'flex', alignItems: 'center', justifyContent: 'center',
+                              flexShrink: 0,
+                            }}>
+                              <PictureAsPdfIcon sx={{ fontSize: 28, color: topic.pdf_url ? '#DC2626' : 'text.disabled' }} />
+                            </Box>
+                            <Box sx={{ flex: 1, minWidth: 0 }}>
+                              <Typography variant="subtitle1" fontWeight={700} sx={{ lineHeight: 1.3, mb: 0.3 }}>
+                                {topic.label}
+                              </Typography>
+                              {topic.subtitle && (
+                                <Typography variant="body2" color="text.secondary" sx={{ lineHeight: 1.4 }}>
+                                  {topic.subtitle}
+                                </Typography>
+                              )}
+                            </Box>
+                          </Box>
+                          <Box sx={{ display: 'flex', gap: 1, mt: 3, alignItems: 'center' }}>
+                            {topic.year && (
+                              <Chip
+                                icon={<CalendarTodayIcon sx={{ fontSize: '0.75rem !important' }} />}
+                                label={topic.year}
+                                size="small"
+                                variant="outlined"
+                                sx={{ height: 24, fontSize: '0.7rem', borderColor: 'rgba(14,91,68,0.3)', color: 'primary.main' }}
+                              />
+                            )}
+                            <Chip
+                              label={topic.pdf_url ? 'View PDF' : 'Coming Soon'}
+                              size="small"
+                              sx={{
+                                height: 24, fontSize: '0.7rem', fontWeight: 600,
+                                bgcolor: topic.pdf_url ? 'rgba(14,91,68,0.1)' : 'rgba(0,0,0,0.06)',
+                                color: topic.pdf_url ? 'primary.main' : 'text.disabled',
+                              }}
+                            />
+                          </Box>
+                        </CardContent>
+                      </Card>
+                    </motion.div>
+                  </FadeInSection>
+                </Grid>
+              ))}
+
+              {topics.length > 5 && (
+                <Grid size={{ xs: 12, sm: 6, md: 4 }}>
+                  <FadeInSection delay={5 * 0.08}>
+                    <motion.div whileHover={{ scale: 1.03, y: -4 }} whileTap={{ scale: 0.98 }} style={{ height: '100%' }}>
+                      <Card
+                        onClick={() => navigate('/resources')}
+                        sx={{
+                          cursor: 'pointer',
+                          borderRadius: 4,
+                          overflow: 'hidden',
+                          height: '100%',
+                          bgcolor: 'primary.main',
+                          color: 'white',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          transition: 'all 0.3s ease',
+                          boxShadow: '0 8px 24px rgba(14,91,68,0.2)',
+                          '&:hover': {
+                            bgcolor: 'primary.dark',
+                          }
+                        }}
+                      >
+                        <CardContent sx={{ textAlign: 'center', p: 4 }}>
+                          <Typography variant="h5" fontWeight={700} sx={{ mb: 1 }}>Explore More</Typography>
+                          <Typography variant="body2" sx={{ opacity: 0.85 }}>View all {topics.length} study materials and PDFs</Typography>
+                        </CardContent>
+                      </Card>
+                    </motion.div>
+                  </FadeInSection>
+                </Grid>
+              )}
+            </Grid>
+          )}
         </Container>
       </Box>
 

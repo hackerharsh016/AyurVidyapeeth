@@ -17,6 +17,7 @@ import LearningPage from './pages/learning/LearningPage';
 import VideoPlayerPage from './pages/learning/VideoPlayerPage';
 import ProfilePage from './pages/ProfilePage';
 import TopicDetailPage from './pages/TopicDetailPage';
+import ResourcesPage from './pages/ResourcesPage';
 import CreatorDashboard from './pages/creator/CreatorDashboard';
 import UploadCoursePage from './pages/creator/UploadCoursePage';
 import AdminPanel from './pages/admin/AdminPanel';
@@ -45,6 +46,7 @@ function AnimatedRoutes() {
           <Route path="/directory" element={<DirectoryPage />} />
           <Route path="/directory/:slug" element={<DirectoryDetailPage />} />
           <Route path="/topic/:slug" element={<TopicDetailPage />} />
+          <Route path="/resources" element={<ResourcesPage />} />
           <Route path="/courses" element={<CoursesPage />} />
           <Route path="/courses/:id" element={<CourseDetailPage />} />
           <Route path="/learning" element={<LearningPage />} />
