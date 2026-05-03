@@ -30,6 +30,9 @@ import CircularProgress from '@mui/material/CircularProgress';
 import Divider from '@mui/material/Divider';
 import IconButton from '@mui/material/IconButton';
 import TextField from '@mui/material/TextField';
+import Tabs from '@mui/material/Tabs';
+import Tab from '@mui/material/Tab';
+import RichTextEditor from '../../components/RichTextEditor';
 
 import HomeIcon from '@mui/icons-material/Home';
 import PersonIcon from '@mui/icons-material/Person';
@@ -103,28 +106,11 @@ interface DirectoryEntry {
   type: string;
   title: string;
   slug: string;
-  sanskrit_name: string;
-  english_name: string;
-  meaning: string;
-  summary: string;
-  definition: string;
-  introduction: string;
-  etiology: string;
-  synonyms: string[] | string;
-  origin: string;
-  panchabhautikatva: string;
-  swaroop: string;
-  characteristics: string[] | string;
-  types_description: string;
-  sankhya: string;
-  prakar_charak: string;
-  prakar_sushruta: string;
-  moolasthana: string;
-  viddha_lakshan: string;
-  dushti: string;
-  functions: string[] | string;
-  disorders: string[] | string;
-  treatment_principles: string[] | string;
+  excerpt: string;
+  content: string;
+  reading_time: number;
+  author: string;
+  created_at?: string;
 }
 
 export default function AdminPanel() {
@@ -158,14 +144,9 @@ export default function AdminPanel() {
   const [directoryEntries, setDirectoryEntries] = useState<DirectoryEntry[]>([]);
   const [directoryDialogOpen, setDirectoryDialogOpen] = useState(false);
   const [editingEntry, setEditingEntry] = useState<DirectoryEntry | null>(null);
-  const [directoryForm, setDirectoryForm] = useState<DirectoryEntry>({
-    type: 'Srotas', title: '', slug: '', sanskrit_name: '', english_name: '', meaning: '',
-    summary: '', definition: '', introduction: '', etiology: '', synonyms: [],
-    origin: '', panchabhautikatva: '', swaroop: '', characteristics: [],
-    types_description: '', sankhya: '', prakar_charak: '', prakar_sushruta: '',
-    moolasthana: '', viddha_lakshan: '', dushti: '', functions: [],
-    disorders: [], treatment_principles: []
-  });
+  const emptyDirectoryForm: DirectoryEntry = { type: 'Srotas', title: '', slug: '', excerpt: '', content: '', reading_time: 5, author: 'Editorial Team' };
+  const [directoryForm, setDirectoryForm] = useState<DirectoryEntry>(emptyDirectoryForm);
+  const [editorMode, setEditorMode] = useState<'visual' | 'html'>('visual');
 
   const fetchData = async () => {
     setLoading(true);
@@ -363,29 +344,15 @@ export default function AdminPanel() {
 
   const handleSaveDirectoryEntry = async () => {
     try {
-      const {
-        id,
-        ...rest
-      } = directoryForm;
-
-      const dataToSave = {
-        ...rest,
-        // Ensure arrays are handled correctly
-        synonyms: typeof directoryForm.synonyms === 'string' ? (directoryForm.synonyms as string).split(',').map(s => s.trim()).filter(Boolean) : (directoryForm.synonyms || []),
-        characteristics: typeof directoryForm.characteristics === 'string' ? (directoryForm.characteristics as string).split(',').map(s => s.trim()).filter(Boolean) : (directoryForm.characteristics || []),
-        functions: typeof directoryForm.functions === 'string' ? (directoryForm.functions as string).split(',').map(s => s.trim()).filter(Boolean) : (directoryForm.functions || []),
-        disorders: typeof directoryForm.disorders === 'string' ? (directoryForm.disorders as string).split(',').map(s => s.trim()).filter(Boolean) : (directoryForm.disorders || []),
-        treatment_principles: typeof directoryForm.treatment_principles === 'string' ? (directoryForm.treatment_principles as string).split(',').map(s => s.trim()).filter(Boolean) : (directoryForm.treatment_principles || []),
-      };
-
+      const { id, created_at, ...rest } = directoryForm as DirectoryEntry & { created_at?: string };
       if (editingEntry && editingEntry.id) {
-        const { error } = await supabase.from('directory_entries').update(dataToSave).eq('id', editingEntry.id);
+        const { error } = await supabase.from('directory_entries').update(rest).eq('id', editingEntry.id);
         if (error) throw error;
-        setToast({ open: true, message: 'Entry updated successfully!', severity: 'success' });
+        setToast({ open: true, message: 'Article updated successfully!', severity: 'success' });
       } else {
-        const { error } = await supabase.from('directory_entries').insert(dataToSave);
+        const { error } = await supabase.from('directory_entries').insert(rest);
         if (error) throw error;
-        setToast({ open: true, message: 'Entry created successfully!', severity: 'success' });
+        setToast({ open: true, message: 'Article created successfully!', severity: 'success' });
       }
       setDirectoryDialogOpen(false);
       fetchData();
@@ -724,73 +691,51 @@ export default function AdminPanel() {
                       <Box sx={{ mb: 4, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                         <Box>
                           <Typography variant="h4" fontWeight={700} gutterBottom>Ayurveda Encyclopedia</Typography>
-                          <Typography variant="body2" color="text.secondary">Manage the central directory of Srotas, Doshas, Herbs, and Diseases.</Typography>
+                          <Typography variant="body2" color="text.secondary">Manage the single, comprehensive encyclopedia page content. Supports rich HTML with multiple sections.</Typography>
                         </Box>
-                        <Button 
-                          variant="contained" 
-                          startIcon={<AddIcon />} 
-                          onClick={() => {
-                            setEditingEntry(null);
-                            setDirectoryForm({
-                              type: 'Srotas', title: '', slug: '', sanskrit_name: '', english_name: '', meaning: '',
-                              summary: '', definition: '', introduction: '', etiology: '', synonyms: [],
-                              origin: '', panchabhautikatva: '', swaroop: '', characteristics: [],
-                              types_description: '', sankhya: '', prakar_charak: '', prakar_sushruta: '',
-                              moolasthana: '', viddha_lakshan: '', dushti: '', functions: [],
-                              disorders: [], treatment_principles: []
-                            });
-                            setDirectoryDialogOpen(true);
-                          }}
-                        >
-                          Add New Entry
-                        </Button>
                       </Box>
 
-                      <TableContainer component={Paper} elevation={0} sx={{ borderRadius: 3, border: '1px solid', borderColor: 'divider' }}>
-                        <Table>
-                          <TableHead>
-                            <TableRow sx={{ bgcolor: 'rgba(14,91,68,0.04)' }}>
-                              <TableCell sx={{ fontWeight: 700 }}>Entry Name</TableCell>
-                              <TableCell sx={{ fontWeight: 700 }}>Category</TableCell>
-                              <TableCell sx={{ fontWeight: 700 }}>Slug</TableCell>
-                              <TableCell sx={{ fontWeight: 700 }}>Last Updated</TableCell>
-                              <TableCell sx={{ fontWeight: 700 }}>Actions</TableCell>
-                            </TableRow>
-                          </TableHead>
-                          <TableBody>
-                            {directoryEntries.length === 0 ? (
-                              <TableRow>
-                                <TableCell colSpan={5} align="center" sx={{ py: 8 }}>
-                                  <Box sx={{ opacity: 0.5 }}>
-                                    <MenuBookIcon sx={{ fontSize: 48, mb: 1 }} />
-                                    <Typography variant="h6">No entries found</Typography>
-                                  </Box>
-                                </TableCell>
-                              </TableRow>
-                            ) : (
-                              directoryEntries.map((entry) => (
-                                <TableRow key={entry.id} sx={{ '&:hover': { bgcolor: 'rgba(14,91,68,0.02)' } }}>
-                                  <TableCell>
-                                    <Typography variant="body2" fontWeight={600}>{entry.title}</Typography>
-                                    <Typography variant="caption" color="text.secondary">{entry.sanskrit_name}</Typography>
-                                  </TableCell>
-                                  <TableCell><Chip label={entry.type} size="small" variant="outlined" /></TableCell>
-                                  <TableCell><Typography variant="caption" sx={{ fontFamily: 'monospace' }}>{entry.slug}</Typography></TableCell>
-                                  <TableCell><Typography variant="body2" color="text.secondary">Live</Typography></TableCell>
-                                  <TableCell>
-                                    <IconButton size="small" onClick={() => {
-                                      setEditingEntry(entry);
-                                      setDirectoryForm(entry);
-                                      setDirectoryDialogOpen(true);
-                                    }}><EditIcon fontSize="small" /></IconButton>
-                                    <IconButton size="small" color="error" onClick={() => entry.id && handleDeleteEntry(entry.id)}><DeleteIcon fontSize="small" /></IconButton>
-                                  </TableCell>
-                                </TableRow>
-                              ))
-                            )}
-                          </TableBody>
-                        </Table>
-                      </TableContainer>
+                      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                        {directoryEntries.length === 0 ? (
+                          <Box sx={{ py: 12, textAlign: 'center', opacity: 0.5, border: '2px dashed', borderColor: 'divider', borderRadius: 4 }}>
+                            <MenuBookIcon sx={{ fontSize: 56, mb: 2, color: 'text.disabled' }} />
+                            <Typography variant="h6" color="text.secondary">Encyclopedia Not Initialized</Typography>
+                            <Typography variant="body2" color="text.disabled" sx={{ mb: 3 }}>Click below to create the main encyclopedia page.</Typography>
+                            <Button
+                              variant="contained"
+                              startIcon={<AddIcon />}
+                              onClick={() => { setEditingEntry(null); setDirectoryForm(emptyDirectoryForm); setDirectoryDialogOpen(true); }}
+                            >
+                              Initialize Content
+                            </Button>
+                          </Box>
+                        ) : (
+                          <Card elevation={0} sx={{ border: '2px solid', borderColor: 'primary.main', borderRadius: 3, p: 2 }}>
+                            <CardContent sx={{ display: 'flex', alignItems: 'center', gap: 3 }}>
+                              <Box sx={{ p: 2, bgcolor: 'rgba(14,91,68,0.08)', borderRadius: 3 }}>
+                                <MenuBookIcon color="primary" sx={{ fontSize: 40 }} />
+                              </Box>
+                              <Box sx={{ flex: 1, minWidth: 0 }}>
+                                <Typography variant="h5" fontWeight={800} sx={{ mb: 0.5 }}>Main Encyclopedia Page</Typography>
+                                <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                                  This content acts as the single, authoritative page for the entire directory.
+                                </Typography>
+                                <Typography variant="caption" color="text.disabled">{directoryEntries[0].reading_time} min read • Updated recently</Typography>
+                              </Box>
+                              <Box>
+                                <Button
+                                  size="large"
+                                  startIcon={<EditIcon />}
+                                  variant="contained"
+                                  onClick={() => { setEditingEntry(directoryEntries[0]); setDirectoryForm(directoryEntries[0]); setDirectoryDialogOpen(true); }}
+                                >
+                                  Edit Content
+                                </Button>
+                              </Box>
+                            </CardContent>
+                          </Card>
+                        )}
+                      </Box>
                     </>
                   )}
 
@@ -1054,153 +999,189 @@ export default function AdminPanel() {
         </DialogActions>
       </Dialog>
 
-      {/* Directory Entry Dialog */}
-      <Dialog 
-        open={directoryDialogOpen} 
-        onClose={() => setDirectoryDialogOpen(false)} 
-        maxWidth="md" 
-        fullWidth 
-        PaperProps={{ sx: { borderRadius: 4 } }}
+      {/* Document Editor Dialog */}
+      <Dialog
+        open={directoryDialogOpen}
+        onClose={() => setDirectoryDialogOpen(false)}
+        maxWidth="lg"
+        fullWidth
+        PaperProps={{ sx: { borderRadius: 4, height: '90vh' } }}
       >
-        <DialogTitle sx={{ fontWeight: 800 }}>{editingEntry ? 'Edit Encyclopedia Entry' : 'Add New Encyclopedia Entry'}</DialogTitle>
-        <DialogContent dividers>
-          <Grid container spacing={2.5} sx={{ pt: 1 }}>
-            <Grid size={{ xs: 12, md: 6 }}>
-              <TextField 
-                select
-                label="Category / Type" 
-                value={directoryForm.type} 
-                onChange={e => setDirectoryForm({...directoryForm, type: e.target.value})} 
-                fullWidth size="small"
-                SelectProps={{ native: true }}
-              >
-                <option value="Srotas">Srotas</option>
-                <option value="Dosha">Dosha</option>
-                <option value="Dhatu">Dhatu</option>
-                <option value="Herbs">Herbs</option>
-                <option value="Disease">Disease</option>
-              </TextField>
+        <DialogTitle sx={{ fontWeight: 800, borderBottom: '1px solid', borderColor: 'divider', pb: 2 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+            <Box sx={{ p: 1, bgcolor: 'rgba(14,91,68,0.08)', borderRadius: 2, display: 'flex' }}>
+              <MenuBookIcon color="primary" />
+            </Box>
+            <Box>
+              <Typography variant="h6" fontWeight={800}>{editingEntry ? 'Edit Article' : 'Write New Article'}</Typography>
+              
+            </Box>
+          </Box>
+        </DialogTitle>
+        <DialogContent sx={{ p: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+          <Grid container sx={{ height: '100%' }}>
+            {/* Left: Metadata panel */}
+            <Grid size={{ xs: 12, md: 3 }} sx={{ borderRight: '1px solid', borderColor: 'divider', p: 3, overflowY: 'auto', bgcolor: '#FAFAF8' }}>
+              <Typography variant="overline" sx={{ fontWeight: 700, color: 'text.disabled', letterSpacing: 2, display: 'block', mb: 2 }}>Article Metadata</Typography>
+              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                <TextField
+                  select
+                  label="Category"
+                  value={directoryForm.type}
+                  onChange={e => setDirectoryForm({ ...directoryForm, type: e.target.value })}
+                  fullWidth size="small"
+                  SelectProps={{ native: true }}
+                >
+                  <option value="Srotas">🌊 Srotas</option>
+                  <option value="Dosha">⚡ Dosha</option>
+                  <option value="Dhatu">💎 Dhatu</option>
+                  <option value="Herbs">🌱 Herbs</option>
+                  <option value="Disease">🩺 Disease</option>
+                </TextField>
+
+                <TextField
+                  label="Article Title"
+                  value={directoryForm.title}
+                  onChange={e => {
+                    const title = e.target.value;
+                    const slug = title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+                    setDirectoryForm({ ...directoryForm, title, slug });
+                  }}
+                  fullWidth size="small"
+                  placeholder="e.g. Srotas Sharir"
+                />
+
+                <TextField
+                  label="URL Slug"
+                  value={directoryForm.slug}
+                  onChange={e => setDirectoryForm({ ...directoryForm, slug: e.target.value })}
+                  fullWidth size="small"
+                  placeholder="srotas-sharir"
+                  InputProps={{ sx: { fontFamily: 'monospace', fontSize: '0.82rem' } }}
+                  helperText="/directory/[slug]"
+                />
+
+                <TextField
+                  label="Excerpt (summary for cards)"
+                  value={directoryForm.excerpt}
+                  onChange={e => setDirectoryForm({ ...directoryForm, excerpt: e.target.value })}
+                  fullWidth size="small"
+                  multiline rows={4}
+                  placeholder="2-3 sentence summary shown on the blog listing page..."
+                />
+
+                <TextField
+                  label="Reading Time (minutes)"
+                  type="number"
+                  value={directoryForm.reading_time}
+                  onChange={e => setDirectoryForm({ ...directoryForm, reading_time: parseInt(e.target.value) || 5 })}
+                  fullWidth size="small"
+                  inputProps={{ min: 1, max: 120 }}
+                />
+
+                <TextField
+                  label="Author"
+                  value={directoryForm.author}
+                  onChange={e => setDirectoryForm({ ...directoryForm, author: e.target.value })}
+                  fullWidth size="small"
+                  placeholder="Editorial Team"
+                />
+
+                <Divider />
+                <Box sx={{ p: 2, bgcolor: 'rgba(14,91,68,0.04)', borderRadius: 2, border: '1px solid rgba(14,91,68,0.1)' }}>
+                  <Typography variant="caption" fontWeight={700} color="primary.main" display="block" mb={1}>Quick HTML Tags</Typography>
+                  {[
+                    ['&lt;h2&gt;', 'Section heading'],
+                    ['&lt;h3&gt;', 'Sub-heading'],
+                    ['&lt;p&gt;', 'Paragraph'],
+                    ['&lt;blockquote&gt;', 'Sanskrit quote'],
+                    ['&lt;ul&gt;&lt;li&gt;', 'Bullet list'],
+                    ['&lt;ol&gt;&lt;li&gt;', 'Numbered list'],
+                    ['&lt;strong&gt;', 'Bold'],
+                    ['&lt;em&gt;', 'Highlight (green)'],
+                  ].map(([tag, desc]) => (
+                    <Box key={tag} sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
+                      <Typography variant="caption" sx={{ fontFamily: 'monospace', color: '#0E5B44', fontSize: '0.7rem' }} dangerouslySetInnerHTML={{ __html: tag }} />
+                      <Typography variant="caption" color="text.disabled" sx={{ fontSize: '0.68rem' }}>{desc}</Typography>
+                    </Box>
+                  ))}
+                </Box>
+              </Box>
             </Grid>
-            <Grid size={{ xs: 12, md: 6 }}>
-              <TextField 
-                label="Entry Title (English Name)" 
-                value={directoryForm.title} 
-                onChange={e => setDirectoryForm({...directoryForm, title: e.target.value, english_name: e.target.value})} 
-                fullWidth size="small"
-              />
-            </Grid>
-            <Grid size={{ xs: 12, md: 6 }}>
-              <TextField 
-                label="Sanskrit Name" 
-                value={directoryForm.sanskrit_name} 
-                onChange={e => setDirectoryForm({...directoryForm, sanskrit_name: e.target.value})} 
-                fullWidth size="small"
-              />
-            </Grid>
-            <Grid size={{ xs: 12, md: 6 }}>
-              <TextField 
-                label="Slug" 
-                value={directoryForm.slug} 
-                onChange={e => setDirectoryForm({...directoryForm, slug: e.target.value})} 
-                fullWidth size="small"
-              />
-            </Grid>
-            <Grid size={{ xs: 12 }}>
-              <TextField 
-                label="Meaning / Etymology Summary" 
-                value={directoryForm.meaning} 
-                onChange={e => setDirectoryForm({...directoryForm, meaning: e.target.value})} 
-                fullWidth size="small" multiline rows={2}
-              />
-            </Grid>
-            <Grid size={{ xs: 12 }}>
-              <TextField 
-                label="Short Summary (Landing Page)" 
-                value={directoryForm.summary} 
-                onChange={e => setDirectoryForm({...directoryForm, summary: e.target.value})} 
-                fullWidth size="small" multiline rows={2}
-              />
-            </Grid>
-            <Grid size={{ xs: 12 }}>
-              <Divider sx={{ my: 1 }}><Chip label="Detailed Content" size="small" /></Divider>
-            </Grid>
-            <Grid size={{ xs: 12 }}>
-              <TextField 
-                label="Introduction" 
-                value={directoryForm.introduction} 
-                onChange={e => setDirectoryForm({...directoryForm, introduction: e.target.value})} 
-                fullWidth size="small" multiline rows={3}
-              />
-            </Grid>
-            <Grid size={{ xs: 12 }}>
-              <TextField 
-                label="Definition (Nirukti/Lakshan)" 
-                value={directoryForm.definition} 
-                onChange={e => setDirectoryForm({...directoryForm, definition: e.target.value})} 
-                fullWidth size="small" multiline rows={3}
-              />
-            </Grid>
-            <Grid size={{ xs: 12, md: 6 }}>
-              <TextField 
-                label="Moolasthana (Origin)" 
-                value={directoryForm.moolasthana} 
-                onChange={e => setDirectoryForm({...directoryForm, moolasthana: e.target.value})} 
-                fullWidth size="small"
-              />
-            </Grid>
-            <Grid size={{ xs: 12, md: 6 }}>
-              <TextField 
-                label="Swaroop (Appearance/Nature)" 
-                value={directoryForm.swaroop} 
-                onChange={e => setDirectoryForm({...directoryForm, swaroop: e.target.value})} 
-                fullWidth size="small"
-              />
-            </Grid>
-            <Grid size={{ xs: 12, md: 6 }}>
-              <TextField 
-                label="Sankhya (Number/Types)" 
-                value={directoryForm.sankhya} 
-                onChange={e => setDirectoryForm({...directoryForm, sankhya: e.target.value})} 
-                fullWidth size="small"
-              />
-            </Grid>
-            <Grid size={{ xs: 12, md: 6 }}>
-              <TextField 
-                label="Synonyms (Comma separated)" 
-                value={Array.isArray(directoryForm.synonyms) ? directoryForm.synonyms.join(', ') : directoryForm.synonyms} 
-                onChange={e => setDirectoryForm({...directoryForm, synonyms: e.target.value})} 
-                fullWidth size="small"
-              />
-            </Grid>
-            <Grid size={{ xs: 12 }}>
-              <TextField 
-                label="Functions / Karma (Comma separated)" 
-                value={Array.isArray(directoryForm.functions) ? directoryForm.functions.join(', ') : directoryForm.functions} 
-                onChange={e => setDirectoryForm({...directoryForm, functions: e.target.value})} 
-                fullWidth size="small" multiline rows={2}
-              />
-            </Grid>
-            <Grid size={{ xs: 12 }}>
-              <TextField 
-                label="Associated Disorders / Dushti (Comma separated)" 
-                value={Array.isArray(directoryForm.disorders) ? directoryForm.disorders.join(', ') : directoryForm.disorders} 
-                onChange={e => setDirectoryForm({...directoryForm, disorders: e.target.value})} 
-                fullWidth size="small" multiline rows={2}
-              />
-            </Grid>
-            <Grid size={{ xs: 12 }}>
-              <TextField 
-                label="Treatment Principles (Comma separated)" 
-                value={Array.isArray(directoryForm.treatment_principles) ? directoryForm.treatment_principles.join(', ') : directoryForm.treatment_principles} 
-                onChange={e => setDirectoryForm({...directoryForm, treatment_principles: e.target.value})} 
-                fullWidth size="small" multiline rows={2}
-              />
+
+            {/* Right: Content editor with tabs */}
+            <Grid size={{ xs: 12, md: 9 }} sx={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
+              {/* Tab switcher */}
+              <Box sx={{ borderBottom: '1px solid', borderColor: 'divider', bgcolor: '#FAFAF8', display: 'flex', alignItems: 'center', justifyContent: 'space-between', px: 2 }}>
+                <Tabs
+                  value={editorMode}
+                  onChange={(_e, v) => setEditorMode(v)}
+                  sx={{
+                    minHeight: 44,
+                    '& .MuiTab-root': { minHeight: 44, fontWeight: 700, fontSize: '0.8rem', textTransform: 'none', px: 2 },
+                    '& .MuiTabs-indicator': { bgcolor: 'primary.main', height: 3, borderRadius: '3px 3px 0 0' },
+                  }}
+                >
+                  <Tab value="visual" label="✏️  Visual Editor" />
+                  <Tab value="html" label="</> HTML Editor" />
+                </Tabs>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <Chip
+                    label={editorMode === 'visual' ? 'WYSIWYG Mode' : 'Raw HTML Mode'}
+                    size="small"
+                    sx={{ bgcolor: editorMode === 'visual' ? '#E8F5EF' : '#EDE9FE', color: editorMode === 'visual' ? '#065F46' : '#5B21B6', fontSize: '0.65rem', fontWeight: 700 }}
+                  />
+                  <Typography variant="caption" color="text.disabled">{directoryForm.content?.length || 0} chars</Typography>
+                </Box>
+              </Box>
+
+              {/* Visual Editor */}
+              <Box sx={{ flex: 1, overflow: 'hidden', display: editorMode === 'visual' ? 'flex' : 'none', flexDirection: 'column' }}>
+                <RichTextEditor
+                  value={directoryForm.content || ''}
+                  onChange={(html) => setDirectoryForm(f => ({ ...f, content: html }))}
+                  placeholder="Start writing your article... Use the toolbar above for formatting."
+                />
+              </Box>
+
+              {/* HTML Editor */}
+              <Box sx={{ flex: 1, overflow: 'hidden', display: editorMode === 'html' ? 'flex' : 'none', flexDirection: 'column' }}>
+                <textarea
+                  value={directoryForm.content}
+                  onChange={e => setDirectoryForm({ ...directoryForm, content: e.target.value })}
+                  placeholder={`<h1>Article Title</h1>\n\n<h2>Introduction</h2>\n<p>Write your introduction here...</p>\n\n<h2>Definition</h2>\n<blockquote>Sanskrit verse here (च.सू.)</blockquote>\n<p>Explanation...</p>`}
+                  style={{
+                    flex: 1,
+                    width: '100%',
+                    border: 'none',
+                    outline: 'none',
+                    resize: 'none',
+                    padding: '24px',
+                    fontSize: '13px',
+                    fontFamily: '"JetBrains Mono", "Fira Code", "Courier New", monospace',
+                    lineHeight: '1.8',
+                    color: '#1f2937',
+                    backgroundColor: '#fff',
+                    boxSizing: 'border-box',
+                    tabSize: 2,
+                  }}
+                />
+              </Box>
             </Grid>
           </Grid>
         </DialogContent>
-        <DialogActions sx={{ p: 3 }}>
-          <Button onClick={() => setDirectoryDialogOpen(false)}>Cancel</Button>
-          <Button variant="contained" onClick={handleSaveDirectoryEntry}>{editingEntry ? 'Update Entry' : 'Create Entry'}</Button>
+        <DialogActions sx={{ p: 2.5, borderTop: '1px solid', borderColor: 'divider', gap: 1 }}>
+          <Button onClick={() => setDirectoryDialogOpen(false)} variant="outlined" color="inherit">Cancel</Button>
+          <Box sx={{ flex: 1 }} />
+          <Button
+            variant="contained"
+            onClick={handleSaveDirectoryEntry}
+            disabled={!directoryForm.title || !directoryForm.slug}
+            size="large"
+            sx={{ px: 4 }}
+          >
+            {editingEntry ? '✓ Update Article' : '✓ Publish Article'}
+          </Button>
         </DialogActions>
       </Dialog>
 

@@ -10,7 +10,6 @@ import { supabase } from './supabase/supabase';
 
 import HomePage from './pages/HomePage';
 import DirectoryPage from './pages/directory/DirectoryPage';
-import DirectoryDetailPage from './pages/directory/DirectoryDetailPage';
 import CoursesPage from './pages/courses/CoursesPage';
 import CourseDetailPage from './pages/courses/CourseDetailPage';
 import LearningPage from './pages/learning/LearningPage';
@@ -44,7 +43,6 @@ function AnimatedRoutes() {
         <Routes location={location}>
           <Route path="/" element={<HomePage />} />
           <Route path="/directory" element={<DirectoryPage />} />
-          <Route path="/directory/:slug" element={<DirectoryDetailPage />} />
           <Route path="/topic/:slug" element={<TopicDetailPage />} />
           <Route path="/resources" element={<ResourcesPage />} />
           <Route path="/courses" element={<CoursesPage />} />
