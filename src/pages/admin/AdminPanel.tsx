@@ -32,6 +32,11 @@ import IconButton from '@mui/material/IconButton';
 import TextField from '@mui/material/TextField';
 import Tabs from '@mui/material/Tabs';
 import Tab from '@mui/material/Tab';
+import Drawer from '@mui/material/Drawer';
+import useMediaQuery from '@mui/material/useMediaQuery';
+import { useTheme } from '@mui/material/styles';
+import MenuIcon from '@mui/icons-material/Menu';
+import CloseIcon from '@mui/icons-material/Close';
 import RichTextEditor from '../../components/RichTextEditor';
 
 import HomeIcon from '@mui/icons-material/Home';
@@ -115,10 +120,13 @@ interface DirectoryEntry {
 }
 
 export default function AdminPanel() {
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('md'));
   const navigate = useNavigate();
   const { user: currentUser, isAuthenticated } = useAuthStore();
   const { courses, updateCourseStatus } = useCourseStore();
   const [view, setView] = useState<AdminView>('home');
+  const [mobileOpen, setMobileOpen] = useState(false);
   const [selectedCourse, setSelectedCourse] = useState<any | null>(null);
   const [loading, setLoading] = useState(true);
   const [debugInfo, setDebugInfo] = useState<string | null>(null);
@@ -183,7 +191,13 @@ export default function AdminPanel() {
       const ownedCourses = crRes.data || [];
       const totalCourses = coursesCountRes.count || 0;
       setHomepageTopics(topicsRes.data || []);
-      setCertTemplateUrl(certRes.data?.template_url || null);
+      
+      // Safe check for certificate settings
+      if (certRes.data) {
+        setCertTemplateUrl(certRes.data.template_url);
+      } else {
+        setCertTemplateUrl(null);
+      }
       
       const mappedDirectory = (directoryRes.data || []).map((entry: any) => ({
         ...entry,
@@ -254,12 +268,20 @@ export default function AdminPanel() {
       
       const { data: { publicUrl } } = supabase.storage.from('assets').getPublicUrl(fileName);
       
-      const { error: dbError } = await supabase
-        .from('certificate_settings')
-        .update({ template_url: publicUrl })
-        .eq('id', (await supabase.from('certificate_settings').select('id').single()).data?.id);
-        
-      if (dbError) throw dbError;
+      const { data: certSettings } = await supabase.from('certificate_settings').select('id').single();
+      
+      if (certSettings?.id) {
+        const { error: dbError } = await supabase
+          .from('certificate_settings')
+          .update({ template_url: publicUrl })
+          .eq('id', certSettings.id);
+        if (dbError) throw dbError;
+      } else {
+        const { error: dbError } = await supabase
+          .from('certificate_settings')
+          .insert({ template_url: publicUrl });
+        if (dbError) throw dbError;
+      }
       
       setCertTemplateUrl(publicUrl);
       setToast({ open: true, message: 'Certificate template uploaded!', severity: 'success' });
@@ -416,37 +438,30 @@ export default function AdminPanel() {
   };
 
   const UserTable = ({ users, type }: { users: AdminUser[], type: 'Student' | 'Creator' }) => (
-    <TableContainer component={Paper} elevation={0} sx={{ borderRadius: 3, border: '1px solid', borderColor: 'divider' }}>
-      <Table>
-        <TableHead>
-          <TableRow sx={{ bgcolor: 'rgba(14,91,68,0.04)' }}>
+    <TableContainer component={Paper} elevation={0} sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 3, overflowX: 'auto' }}>
+      <Table sx={{ minWidth: 650 }}>
+        <TableHead sx={{ bgcolor: '#F8FAFC' }}>
+          <TableRow>
             <TableCell sx={{ fontWeight: 700 }}>{type}</TableCell>
             <TableCell sx={{ fontWeight: 700 }}>College / Institution</TableCell>
-            <TableCell sx={{ fontWeight: 700 }}>Joined</TableCell>
-            <TableCell sx={{ fontWeight: 700 }}>{type === 'Creator' ? 'Courses' : 'Enrolled'}</TableCell>
-            <TableCell sx={{ fontWeight: 700 }}>Actions</TableCell>
+            <TableCell sx={{ fontWeight: 700 }}>Joined Date</TableCell>
+            <TableCell sx={{ fontWeight: 700 }}>{type === 'Creator' ? 'Courses' : 'Enrollments'}</TableCell>
+            <TableCell sx={{ fontWeight: 700 }}>Action</TableCell>
           </TableRow>
         </TableHead>
         <TableBody>
           {users.length === 0 ? (
             <TableRow>
-              <TableCell colSpan={5} align="center" sx={{ py: 8 }}>
-                <Box sx={{ opacity: 0.5 }}>
-                  <Typography variant="h1" sx={{ mb: 1 }}>👥</Typography>
-                  <Typography variant="h6">No {type.toLowerCase()}s found</Typography>
-                </Box>
-              </TableCell>
+              <TableCell colSpan={5} align="center" sx={{ py: 4, color: 'text.secondary' }}>No {type.toLowerCase()}s found</TableCell>
             </TableRow>
           ) : (
-            users.map(u => (
-              <TableRow key={u.id} sx={{ '&:hover': { bgcolor: 'rgba(14,91,68,0.02)' } }}>
+            users.map((u) => (
+              <TableRow key={u.id} hover>
                 <TableCell>
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
                     <Avatar 
-                      onClick={() => navigate(`/profile/${u.id}`)}
                       sx={{ 
-                        bgcolor: type === 'Creator' ? '#D1FAE5' : 'primary.main', 
-                        color: type === 'Creator' ? '#065F46' : 'white',
+                        bgcolor: type === 'Creator' ? 'secondary.main' : 'primary.main',
                         width: 32, height: 32, fontSize: '0.75rem', fontWeight: 700, cursor: 'pointer' 
                       }}
                     >
@@ -485,84 +500,129 @@ export default function AdminPanel() {
     </TableContainer>
   );
 
+  const sidebarContent = (
+    <Box
+      sx={{
+        display: 'flex',
+        flexDirection: 'column',
+        height: '100%',
+        bgcolor: 'white',
+      }}
+    >
+      <Box sx={{ p: 2 }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+            <AdminPanelSettingsIcon color="secondary" />
+            <Typography variant="subtitle1" fontWeight={700}>Admin Console</Typography>
+          </Box>
+          {isMobile && (
+            <IconButton onClick={() => setMobileOpen(false)}>
+              <CloseIcon />
+            </IconButton>
+          )}
+        </Box>
+        <Divider />
+      </Box>
+      
+      <List sx={{ px: 1, flexGrow: 1 }}>
+        {sidebarItems.map((item) => (
+          <ListItem key={item.id} disablePadding sx={{ mb: 0.5 }}>
+            <ListItemButton
+              selected={view === item.id}
+              onClick={() => {
+                setView(item.id as AdminView);
+                if (isMobile) setMobileOpen(false);
+              }}
+              sx={{
+                borderRadius: 2,
+                '&.Mui-selected': {
+                  bgcolor: 'rgba(14,91,68,0.08)',
+                  color: 'primary.main',
+                  '&:hover': { bgcolor: 'rgba(14,91,68,0.12)' },
+                  '& .MuiListItemIcon-root': { color: 'primary.main' }
+                }
+              }}
+            >
+              <ListItemIcon sx={{ minWidth: 40 }}>{item.icon}</ListItemIcon>
+              <ListItemText 
+                primary={item.label} 
+                primaryTypographyProps={{ fontWeight: view === item.id ? 700 : 500, variant: 'body2' }} 
+              />
+              {item.badge ? (
+                <Box sx={{ 
+                  ml: 1, px: 0.8, py: 0.2, borderRadius: 10, 
+                  bgcolor: 'error.main', color: 'white', fontSize: '0.65rem', fontWeight: 700 
+                }}>
+                  {item.badge}
+                </Box>
+              ) : null}
+            </ListItemButton>
+          </ListItem>
+        ))}
+      </List>
+
+      <Box sx={{ p: 2, borderTop: '1px solid', borderColor: 'divider' }}>
+        <Button 
+          fullWidth 
+          startIcon={<RefreshIcon />} 
+          onClick={fetchData} 
+          variant="outlined" 
+          size="small"
+          sx={{ borderRadius: 2 }}
+        >
+          Refresh Data
+        </Button>
+      </Box>
+    </Box>
+  );
+
   return (
     <PageLayout>
       <Box sx={{ display: 'flex', minHeight: 'calc(100vh - 64px)' }}>
-        {/* Sidebar */}
-        <Box
+        {/* Desktop Sidebar */}
+        {!isMobile && (
+          <Box
+            sx={{
+              width: 240,
+              flexShrink: 0,
+              borderRight: '1px solid',
+              borderColor: 'divider',
+              position: 'sticky',
+              top: 64,
+              height: 'calc(100vh - 64px)',
+            }}
+          >
+            {sidebarContent}
+          </Box>
+        )}
+
+        {/* Mobile Sidebar (Drawer) */}
+        <Drawer
+          variant="temporary"
+          open={mobileOpen}
+          onClose={() => setMobileOpen(false)}
+          ModalProps={{ keepMounted: true }}
           sx={{
-            width: { xs: 70, md: 240 },
-            flexShrink: 0,
-            borderRight: '1px solid',
-            borderColor: 'divider',
-            bgcolor: 'white',
-            display: 'flex',
-            flexDirection: 'column',
-            position: 'sticky',
-            top: 64,
-            height: 'calc(100vh - 64px)',
-            zIndex: 10,
+            display: { xs: 'block', md: 'none' },
+            '& .MuiDrawer-paper': { boxSizing: 'border-box', width: 280 },
           }}
         >
-          <Box sx={{ p: 2, display: { xs: 'none', md: 'block' } }}>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 2 }}>
-              <AdminPanelSettingsIcon color="secondary" />
-              <Typography variant="subtitle1" fontWeight={700}>Admin Console</Typography>
-            </Box>
-            <Divider />
-          </Box>
-          
-          <List sx={{ px: 1 }}>
-            {sidebarItems.map((item) => (
-              <ListItem key={item.id} disablePadding sx={{ mb: 0.5 }}>
-                <ListItemButton
-                  selected={view === item.id}
-                  onClick={() => setView(item.id as AdminView)}
-                  sx={{
-                    borderRadius: 2,
-                    '&.Mui-selected': {
-                      bgcolor: 'rgba(14,91,68,0.08)',
-                      color: 'primary.main',
-                      '&:hover': { bgcolor: 'rgba(14,91,68,0.12)' },
-                      '& .MuiListItemIcon-root': { color: 'primary.main' }
-                    }
-                  }}
-                >
-                  <ListItemIcon sx={{ minWidth: { xs: 40, md: 40 } }}>{item.icon}</ListItemIcon>
-                  <ListItemText 
-                    primary={item.label} 
-                    sx={{ display: { xs: 'none', md: 'block' } }}
-                    primaryTypographyProps={{ fontWeight: view === item.id ? 700 : 500, variant: 'body2' }} 
-                  />
-                  {item.badge ? (
-                    <Box sx={{ 
-                      ml: 1, px: 0.8, py: 0.2, borderRadius: 10, 
-                      bgcolor: 'error.main', color: 'white', fontSize: '0.65rem', fontWeight: 700 
-                    }}>
-                      {item.badge}
-                    </Box>
-                  ) : null}
-                </ListItemButton>
-              </ListItem>
-            ))}
-          </List>
-
-          <Box sx={{ mt: 'auto', p: 2, display: { xs: 'none', md: 'block' } }}>
-            <Button 
-              fullWidth 
-              startIcon={<RefreshIcon />} 
-              onClick={fetchData} 
-              variant="outlined" 
-              size="small"
-              sx={{ borderRadius: 2 }}
-            >
-              Refresh Data
-            </Button>
-          </Box>
-        </Box>
+          {sidebarContent}
+        </Drawer>
 
         {/* Main Content */}
         <Box sx={{ flexGrow: 1, bgcolor: '#F8FAFC', p: { xs: 2, md: 4 } }}>
+          {isMobile && (
+            <Box sx={{ mb: 3, display: 'flex', alignItems: 'center', gap: 2 }}>
+              <IconButton onClick={() => setMobileOpen(true)} color="primary">
+                <MenuIcon />
+              </IconButton>
+              <Typography variant="h6" fontWeight={800}>
+                {sidebarItems.find(i => i.id === view)?.label}
+              </Typography>
+            </Box>
+          )}
+
           <AnimatePresence mode="wait">
             <motion.div
               key={view}
@@ -669,16 +729,17 @@ export default function AdminPanel() {
                   {/* Homepage View */}
                   {view === 'homepage' && (
                     <>
-                      <Box sx={{ mb: 4, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <Box sx={{ mb: 4, display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, justifyContent: 'space-between', alignItems: { xs: 'flex-start', sm: 'center' }, gap: 2 }}>
                         <Box>
-                          <Typography variant="h4" fontWeight={700} gutterBottom>Homepage Settings</Typography>
+                          <Typography variant="h4" fontWeight={700} sx={{ fontSize: { xs: '1.75rem', md: '2.125rem' } }} gutterBottom>Homepage Settings</Typography>
                           <Typography variant="body2" color="text.secondary">Manage topics and content shown on the landing page.</Typography>
                         </Box>
-                        <Box sx={{ display: 'flex', gap: 1 }}>
+                        <Box sx={{ display: 'flex', gap: 1, width: { xs: '100%', sm: 'auto' } }}>
                           {homepageTopics.length === 0 && (
-                            <Button variant="outlined" startIcon={<RefreshIcon />} onClick={seedTopics}>Seed Templates</Button>
+                            <Button fullWidth={isMobile} variant="outlined" startIcon={<RefreshIcon />} onClick={seedTopics}>Seed Templates</Button>
                           )}
                           <Button 
+                            fullWidth={isMobile}
                             variant="contained" 
                             startIcon={<AddIcon />} 
                             onClick={() => {
@@ -730,9 +791,9 @@ export default function AdminPanel() {
                   {/* Encyclopedia View */}
                   {view === 'directory' && (
                     <>
-                      <Box sx={{ mb: 4, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <Box sx={{ mb: 4, display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, justifyContent: 'space-between', alignItems: { xs: 'flex-start', sm: 'center' }, gap: 2 }}>
                         <Box>
-                          <Typography variant="h4" fontWeight={700} gutterBottom>Ayurveda Encyclopedia</Typography>
+                          <Typography variant="h4" fontWeight={700} sx={{ fontSize: { xs: '1.75rem', md: '2.125rem' } }} gutterBottom>Ayurveda Encyclopedia</Typography>
                           <Typography variant="body2" color="text.secondary">Manage the single, comprehensive encyclopedia page content. Supports rich HTML with multiple sections.</Typography>
                         </Box>
                       </Box>
@@ -770,9 +831,17 @@ export default function AdminPanel() {
                                   startIcon={<EditIcon />}
                                   variant="contained"
                                   onClick={() => { setEditingEntry(directoryEntries[0]); setDirectoryForm(directoryEntries[0]); setDirectoryDialogOpen(true); }}
+                                  sx={{ mr: 1 }}
                                 >
                                   Edit Content
                                 </Button>
+                                <IconButton 
+                                  color="error" 
+                                  onClick={() => directoryEntries[0].id && handleDeleteEntry(directoryEntries[0].id)}
+                                  sx={{ border: '1px solid', borderColor: 'error.light' }}
+                                >
+                                  <DeleteIcon />
+                                </IconButton>
                               </Box>
                             </CardContent>
                           </Card>
@@ -810,9 +879,9 @@ export default function AdminPanel() {
                   {/* Courses View */}
                   {view === 'courses' && (
                     <>
-                      <Box sx={{ mb: 4, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                      <Box sx={{ mb: 4, display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, justifyContent: 'space-between', alignItems: { xs: 'flex-start', sm: 'center' }, gap: 2 }}>
                         <Box>
-                          <Typography variant="h4" fontWeight={700} gutterBottom>All Courses</Typography>
+                          <Typography variant="h4" fontWeight={700} sx={{ fontSize: { xs: '1.75rem', md: '2.125rem' } }} gutterBottom>All Courses</Typography>
                           <Typography variant="body2" color="text.secondary">Monitor and manage course inventory.</Typography>
                         </Box>
                         <Box sx={{ display: 'flex', gap: 1 }}>
@@ -824,33 +893,35 @@ export default function AdminPanel() {
                       <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
                         {courses.map((course) => (
                           <Card key={course.id} elevation={0} sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 3 }}>
-                            <CardContent sx={{ display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap' }}>
-                              <Box sx={{ width: 60, height: 60, borderRadius: 2, bgcolor: 'primary.main', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '2rem', flexShrink: 0 }}>
+                            <CardContent sx={{ display: 'flex', alignItems: 'center', gap: { xs: 2, sm: 3 }, flexWrap: 'wrap', p: { xs: 2, sm: 3 } }}>
+                              <Box sx={{ width: { xs: 48, sm: 60 }, height: { xs: 48, sm: 60 }, borderRadius: 2, bgcolor: 'primary.main', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: { xs: '1.5rem', sm: '2rem' }, flexShrink: 0 }}>
                                 🌿
                               </Box>
-                              <Box sx={{ flex: 1, minWidth: 200 }}>
+                              <Box sx={{ flex: 1, minWidth: { xs: '100%', sm: 200 }, mt: { xs: 1, sm: 0 } }}>
                                 <Typography variant="subtitle1" fontWeight={700}>{course.title}</Typography>
                                 <Typography variant="caption" color="text.secondary" display="block">by {course.instructor} • {course.subject}</Typography>
-                                <Box sx={{ mt: 1, display: 'flex', gap: 2 }}>
+                                <Box sx={{ mt: 1, display: 'flex', gap: 2, flexWrap: 'wrap' }}>
                                   <Typography variant="caption" sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>⭐ {course.rating}</Typography>
                                   <Typography variant="caption" sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>👥 {course.students}</Typography>
                                   <Typography variant="caption" sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>💰 {course.free ? 'Free' : `₹${course.price}`}</Typography>
                                 </Box>
                               </Box>
-                              <Chip 
-                                label={course.status} 
-                                color={course.status === 'published' ? 'success' : course.status === 'pending' ? 'warning' : 'default'}
-                                size="small"
-                                sx={{ fontWeight: 700, textTransform: 'capitalize' }}
-                              />
-                              <Box sx={{ display: 'flex', gap: 1 }}>
-                                <IconButton onClick={() => navigate(`/courses/${course.id}`)}><VisibilityIcon fontSize="small" /></IconButton>
-                                {course.status === 'pending' && (
-                                  <Button variant="contained" size="small" onClick={() => setSelectedCourse(course)}>Review</Button>
-                                )}
-                                {course.status === 'published' && (
-                                  <Button variant="outlined" color="error" size="small" onClick={() => handleReject(course.id, course.title)}>Unpublish</Button>
-                                )}
+                              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, width: { xs: '100%', sm: 'auto' }, justifyContent: 'space-between', mt: { xs: 1, sm: 0 } }}>
+                                <Chip 
+                                  label={course.status} 
+                                  color={course.status === 'published' ? 'success' : course.status === 'pending' ? 'warning' : 'default'}
+                                  size="small"
+                                  sx={{ fontWeight: 700, textTransform: 'capitalize' }}
+                                />
+                                <Box sx={{ display: 'flex', gap: 1 }}>
+                                  <IconButton size="small" onClick={() => navigate(`/courses/${course.id}`)}><VisibilityIcon fontSize="small" /></IconButton>
+                                  {course.status === 'pending' && (
+                                    <Button variant="contained" size="small" onClick={() => setSelectedCourse(course)}>Review</Button>
+                                  )}
+                                  {course.status === 'published' && (
+                                    <Button variant="outlined" color="error" size="small" onClick={() => handleReject(course.id, course.title)}>Unpublish</Button>
+                                  )}
+                                </Box>
                               </Box>
                             </CardContent>
                           </Card>

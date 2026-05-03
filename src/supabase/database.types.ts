@@ -14,6 +14,24 @@ export type Database = {
   }
   public: {
     Tables: {
+      certificate_settings: {
+        Row: {
+          id: string
+          template_url: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          id?: string
+          template_url?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          id?: string
+          template_url?: string | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       course_sections: {
         Row: {
           course_id: string | null
@@ -49,9 +67,11 @@ export type Database = {
           created_at: string | null
           creator_id: string | null
           description: string | null
+          has_certificate: boolean | null
           id: string
           language: string | null
           level: string | null
+          original_price: number | null
           price: number | null
           rating: number | null
           status: string | null
@@ -61,6 +81,7 @@ export type Database = {
           thumbnail_url: string | null
           title: string
           total_lessons: number | null
+          validity_months: number | null
           what_you_learn: string[] | null
         }
         Insert: {
@@ -68,9 +89,11 @@ export type Database = {
           created_at?: string | null
           creator_id?: string | null
           description?: string | null
+          has_certificate?: boolean | null
           id?: string
           language?: string | null
           level?: string | null
+          original_price?: number | null
           price?: number | null
           rating?: number | null
           status?: string | null
@@ -80,6 +103,7 @@ export type Database = {
           thumbnail_url?: string | null
           title: string
           total_lessons?: number | null
+          validity_months?: number | null
           what_you_learn?: string[] | null
         }
         Update: {
@@ -87,9 +111,11 @@ export type Database = {
           created_at?: string | null
           creator_id?: string | null
           description?: string | null
+          has_certificate?: boolean | null
           id?: string
           language?: string | null
           level?: string | null
+          original_price?: number | null
           price?: number | null
           rating?: number | null
           status?: string | null
@@ -99,6 +125,7 @@ export type Database = {
           thumbnail_url?: string | null
           title?: string
           total_lessons?: number | null
+          validity_months?: number | null
           what_you_learn?: string[] | null
         }
         Relationships: [
@@ -377,6 +404,160 @@ export type Database = {
           {
             foreignKeyName: "reviews_user_id_fkey"
             columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      test_attempts: {
+        Row: {
+          answers: Json
+          completed_at: string | null
+          id: string
+          score: number
+          test_id: string
+          time_taken_seconds: number | null
+          total_marks: number
+          user_id: string
+        }
+        Insert: {
+          answers?: Json
+          completed_at?: string | null
+          id?: string
+          score?: number
+          test_id: string
+          time_taken_seconds?: number | null
+          total_marks?: number
+          user_id: string
+        }
+        Update: {
+          answers?: Json
+          completed_at?: string | null
+          id?: string
+          score?: number
+          test_id?: string
+          time_taken_seconds?: number | null
+          total_marks?: number
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "test_attempts_test_id_fkey"
+            columns: ["test_id"]
+            isOneToOne: false
+            referencedRelation: "tests"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "test_attempts_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      test_questions: {
+        Row: {
+          correct_option: string
+          created_at: string | null
+          explanation: string | null
+          id: string
+          marks: number
+          option_a: string
+          option_b: string
+          option_c: string
+          option_d: string
+          question: string
+          sort_order: number | null
+          test_id: string
+        }
+        Insert: {
+          correct_option: string
+          created_at?: string | null
+          explanation?: string | null
+          id?: string
+          marks?: number
+          option_a: string
+          option_b: string
+          option_c: string
+          option_d: string
+          question: string
+          sort_order?: number | null
+          test_id: string
+        }
+        Update: {
+          correct_option?: string
+          created_at?: string | null
+          explanation?: string | null
+          id?: string
+          marks?: number
+          option_a?: string
+          option_b?: string
+          option_c?: string
+          option_d?: string
+          question?: string
+          sort_order?: number | null
+          test_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "test_questions_test_id_fkey"
+            columns: ["test_id"]
+            isOneToOne: false
+            referencedRelation: "tests"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      tests: {
+        Row: {
+          created_at: string | null
+          creator_id: string
+          description: string | null
+          duration_minutes: number
+          eligibility: string | null
+          id: string
+          pass_marks: number
+          status: string
+          subject: string | null
+          title: string
+          total_marks: number
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          creator_id: string
+          description?: string | null
+          duration_minutes?: number
+          eligibility?: string | null
+          id?: string
+          pass_marks?: number
+          status?: string
+          subject?: string | null
+          title: string
+          total_marks?: number
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          creator_id?: string
+          description?: string | null
+          duration_minutes?: number
+          eligibility?: string | null
+          id?: string
+          pass_marks?: number
+          status?: string
+          subject?: string | null
+          title?: string
+          total_marks?: number
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tests_creator_id_fkey"
+            columns: ["creator_id"]
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]

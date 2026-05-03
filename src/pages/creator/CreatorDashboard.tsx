@@ -395,9 +395,9 @@ export default function CreatorDashboard() {
                 {filteredCourses.map((course) => (
                   <Grid size={{ xs: 12 }} key={course.id}>
                     <Card elevation={0} sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 4, transition: 'all 0.2s', '&:hover': { borderColor: 'primary.main', boxShadow: '0 4px 20px rgba(0,0,0,0.05)' } }}>
-                      <CardContent sx={{ display: 'flex', alignItems: 'center', gap: 3, p: 3 }}>
-                        <Box sx={{ width: 60, height: 60, borderRadius: 3, bgcolor: 'rgba(14,91,68,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.5rem' }}>🌿</Box>
-                        <Box sx={{ flex: 1 }}>
+                      <CardContent sx={{ display: 'flex', alignItems: 'center', gap: { xs: 2, sm: 3 }, p: { xs: 2, sm: 3 }, flexWrap: 'wrap' }}>
+                        <Box sx={{ width: { xs: 48, sm: 60 }, height: { xs: 48, sm: 60 }, borderRadius: 3, bgcolor: 'rgba(14,91,68,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: { xs: '1.25rem', sm: '1.5rem' }, flexShrink: 0 }}>🌿</Box>
+                        <Box sx={{ flex: 1, minWidth: { xs: '100%', sm: 200 }, mt: { xs: 1, sm: 0 } }}>
                           <Typography variant="subtitle1" fontWeight={700}>{course.title}</Typography>
                           <Box sx={{ display: 'flex', gap: 2, mt: 0.5 }}>
                             <Typography variant="caption" color="text.secondary">📹 {course.totalLessons} lessons</Typography>
@@ -517,9 +517,9 @@ export default function CreatorDashboard() {
   return (
     <PageLayout>
       <Box sx={{ display: 'flex', minHeight: 'calc(100vh - 64px)', bgcolor: '#fbfbfb' }}>
-        {/* Sidebar for Desktop */}
+        {/* Desktop Sidebar */}
         {!isMobile && (
-          <Box sx={{ width: 280, flexShrink: 0, borderRight: '1px solid', borderColor: 'divider', bgcolor: 'white' }}>
+          <Box sx={{ width: 280, flexShrink: 0, borderRight: '1px solid', borderColor: 'divider', bgcolor: 'white', position: 'sticky', top: 64, height: 'calc(100vh - 64px)' }}>
             {sidebarContent}
           </Box>
         )}

@@ -353,19 +353,19 @@ export default function ProfilePage() {
                     const prog = getCourseProgress(courseId, course.totalLessons);
                     return (
                       <Card key={courseId} sx={{ cursor: 'pointer' }} onClick={() => navigate(`/learning/${courseId}`)}>
-                        <CardContent sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
-                          <Box sx={{ width: 48, height: 48, borderRadius: 2, bgcolor: 'primary.main', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.3rem', flexShrink: 0 }}>
+                        <CardContent sx={{ display: 'flex', gap: 2, alignItems: 'center', flexWrap: 'wrap', p: { xs: 2, sm: 3 } }}>
+                          <Box sx={{ width: { xs: 40, sm: 48 }, height: { xs: 40, sm: 48 }, borderRadius: 2, bgcolor: 'primary.main', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.3rem', flexShrink: 0 }}>
                             <img src="/srotoayurveda_logo.jpeg" alt="Logo" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: 'inherit' }} />
                           </Box>
-                          <Box sx={{ flex: 1, minWidth: 0 }}>
-                            <Typography variant="subtitle2" fontWeight={600} noWrap>{course.title}</Typography>
+                          <Box sx={{ flex: 1, minWidth: { xs: '100%', sm: 0 }, order: { xs: 1, sm: 0 } }}>
+                            <Typography variant="subtitle2" fontWeight={600}>{course.title}</Typography>
                             <Typography variant="caption" color="text.secondary">{course.instructor}</Typography>
                             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 0.75 }}>
                               <LinearProgress variant="determinate" value={prog} sx={{ flex: 1, height: 5, borderRadius: 3 }} />
                               <Typography variant="caption" fontWeight={600} color="primary.main">{prog}%</Typography>
                             </Box>
                           </Box>
-                          <Box sx={{ textAlign: 'right', flexShrink: 0 }}>
+                          <Box sx={{ textAlign: { xs: 'left', sm: 'right' }, flexShrink: 0, display: 'flex', flexDirection: { xs: 'row', sm: 'column' }, alignItems: { xs: 'center', sm: 'flex-end' }, gap: { xs: 1.5, sm: 0.5 }, width: { xs: '100%', sm: 'auto' } }}>
                             <Chip
                               label={prog === 100 ? 'Complete' : prog > 0 ? 'In Progress' : 'Not Started'}
                               size="small"
@@ -376,7 +376,7 @@ export default function ProfilePage() {
                                 fontSize: '0.65rem',
                               }}
                             />
-                            <Typography variant="caption" color="text.disabled" display="block" mt={0.5}>
+                            <Typography variant="caption" color="text.disabled">
                               {new Date(enrolledAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}
                             </Typography>
                           </Box>
