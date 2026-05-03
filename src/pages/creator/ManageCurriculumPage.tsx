@@ -11,6 +11,18 @@ import Snackbar from '@mui/material/Snackbar';
 import Alert from '@mui/material/Alert';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import CloudUploadIcon from '@mui/icons-material/CloudUpload';
+import EditIcon from '@mui/icons-material/Edit';
+import DeleteIcon from '@mui/icons-material/Delete';
+import ReplayIcon from '@mui/icons-material/Replay';
+import Dialog from '@mui/material/Dialog';
+import DialogTitle from '@mui/material/DialogTitle';
+import DialogContent from '@mui/material/DialogContent';
+import DialogActions from '@mui/material/DialogActions';
+import List from '@mui/material/List';
+import ListItem from '@mui/material/ListItem';
+import ListItemButton from '@mui/material/ListItemButton';
+import ListItemIcon from '@mui/material/ListItemIcon';
+import ListItemText from '@mui/material/ListItemText';
 import PageLayout from '../../components/PageLayout';
 import { supabase } from '../../supabase/supabase';
 import { useCourseStore } from '../../stores/courseStore';
@@ -27,6 +39,8 @@ export default function ManageCurriculumPage() {
   const [uploadProgress, setUploadProgress] = useState(0);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [selectedLessonId, setSelectedLessonId] = useState<string | null>(null);
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [editingLessonId, setEditingLessonId] = useState<string | null>(null);
 
   const [loading, setLoading] = useState(true);
 
@@ -91,8 +105,25 @@ export default function ManageCurriculumPage() {
         setUploadingLessonId(null);
         setUploadProgress(0);
         setSelectedLessonId(null);
+        setEditingLessonId(null);
         if (fileInputRef.current) fileInputRef.current.value = '';
       }, 500);
+    }
+  };
+
+  const handleDeleteMedia = async (lessonId: string) => {
+    try {
+      const { error } = await supabase
+        .from('lessons')
+        .update({ video_url: null })
+        .eq('id', lessonId);
+
+      if (error) throw error;
+
+      setToast({ open: true, message: 'Media content removed!', severity: 'success' });
+      await fetchCourses();
+    } catch (err: any) {
+      setToast({ open: true, message: err.message || 'Error removing media', severity: 'error' });
     }
   };
 
@@ -169,26 +200,37 @@ export default function ManageCurriculumPage() {
                             </Typography>
                           </Box>
                           
-                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, minWidth: 200, justifyContent: 'flex-end' }}>
-                            {isUploading ? (
-                              <Box sx={{ width: '100%' }}>
-                                <LinearProgress variant="determinate" value={uploadProgress} sx={{ height: 6, borderRadius: 3 }} />
-                                <Typography variant="caption" sx={{ mt: 0.5, display: 'block', textAlign: 'right' }}>
-                                  Uploading... {uploadProgress}%
-                                </Typography>
-                              </Box>
-                            ) : (
-                              <>
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, minWidth: 200, justifyContent: 'flex-end' }}>
+                              {isUploading ? (
+                                <Box sx={{ width: '100%' }}>
+                                  <LinearProgress variant="determinate" value={uploadProgress} sx={{ height: 6, borderRadius: 3 }} />
+                                  <Typography variant="caption" sx={{ mt: 0.5, display: 'block', textAlign: 'right' }}>
+                                    Uploading... {uploadProgress}%
+                                  </Typography>
+                                </Box>
+                              ) : lesson.videoUrl ? (
                                 <Button 
                                   variant="outlined" 
+                                  startIcon={<EditIcon />} 
+                                  onClick={() => {
+                                    setEditingLessonId(lesson.id);
+                                    setEditDialogOpen(true);
+                                  }}
+                                  sx={{ borderRadius: 2, textTransform: 'none' }}
+                                >
+                                  Edit Content
+                                </Button>
+                              ) : (
+                                <Button 
+                                  variant="contained" 
                                   startIcon={<CloudUploadIcon />} 
                                   onClick={() => handleUploadClick(lesson.id)}
+                                  sx={{ borderRadius: 2, textTransform: 'none' }}
                                 >
                                   Upload Video
                                 </Button>
-                              </>
-                            )}
-                          </Box>
+                              )}
+                            </Box>
                         </Box>
                       );
                     })}
@@ -203,6 +245,52 @@ export default function ManageCurriculumPage() {
       <Snackbar open={toast.open} autoHideDuration={3000} onClose={() => setToast(t => ({ ...t, open: false }))}>
         <Alert severity={toast.severity} sx={{ borderRadius: 2 }}>{toast.message}</Alert>
       </Snackbar>
+
+      <Dialog 
+        open={editDialogOpen} 
+        onClose={() => setEditDialogOpen(false)}
+        PaperProps={{ sx: { borderRadius: 3, minWidth: 320 } }}
+      >
+        <DialogTitle sx={{ fontWeight: 700, pb: 1 }}>Edit Lecture Content</DialogTitle>
+        <DialogContent sx={{ pt: 2 }}>
+          <Typography variant="body2" color="text.secondary" mb={3}>
+            Manage the media content for this lecture.
+          </Typography>
+          <List sx={{ p: 0 }}>
+            <ListItem disablePadding>
+              <ListItemButton 
+                onClick={() => {
+                  setEditDialogOpen(false);
+                  if (editingLessonId) handleUploadClick(editingLessonId);
+                }}
+                sx={{ borderRadius: 2, mb: 1 }}
+              >
+                <ListItemIcon sx={{ minWidth: 40, color: 'primary.main' }}>
+                  <ReplayIcon />
+                </ListItemIcon>
+                <ListItemText primary="Re-upload Content" />
+              </ListItemButton>
+            </ListItem>
+            <ListItem disablePadding>
+              <ListItemButton 
+                onClick={() => {
+                  if (editingLessonId) handleDeleteMedia(editingLessonId);
+                  setEditDialogOpen(false);
+                }}
+                sx={{ borderRadius: 2, color: 'error.main' }}
+              >
+                <ListItemIcon sx={{ minWidth: 40, color: 'error.main' }}>
+                  <DeleteIcon />
+                </ListItemIcon>
+                <ListItemText primary="Delete Media Content" />
+              </ListItemButton>
+            </ListItem>
+          </List>
+        </DialogContent>
+        <DialogActions sx={{ p: 2, pt: 0 }}>
+          <Button onClick={() => setEditDialogOpen(false)} color="inherit" sx={{ fontWeight: 600 }}>Cancel</Button>
+        </DialogActions>
+      </Dialog>
     </PageLayout>
   );
 }

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Box from '@mui/material/Box';
 import Container from '@mui/material/Container';
@@ -19,9 +19,26 @@ import Step from '@mui/material/Step';
 import StepLabel from '@mui/material/StepLabel';
 import Snackbar from '@mui/material/Snackbar';
 import Alert from '@mui/material/Alert';
+import Dialog from '@mui/material/Dialog';
+import DialogTitle from '@mui/material/DialogTitle';
+import DialogContent from '@mui/material/DialogContent';
+import DialogActions from '@mui/material/DialogActions';
+import List from '@mui/material/List';
+import ListItem from '@mui/material/ListItem';
+import ListItemButton from '@mui/material/ListItemButton';
+import ListItemIcon from '@mui/material/ListItemIcon';
+import ListItemText from '@mui/material/ListItemText';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
+import EditIcon from '@mui/icons-material/Edit';
+import ReplayIcon from '@mui/icons-material/Replay';
 import AddIcon from '@mui/icons-material/Add';
 import DeleteIcon from '@mui/icons-material/Delete';
+import CloudUploadIcon from '@mui/icons-material/CloudUpload';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import CircularProgress from '@mui/material/CircularProgress';
+import LinearProgress from '@mui/material/LinearProgress';
+import Tooltip from '@mui/material/Tooltip';
+import { supabase } from '../../supabase/supabase';
 import { motion, AnimatePresence } from 'framer-motion';
 import PageLayout from '../../components/PageLayout';
 import { useCourseStore } from '../../stores/courseStore';
@@ -51,9 +68,15 @@ export default function UploadCoursePage() {
     hasCertificate: false,
   });
 
-  const [sections, setSections] = useState<(Omit<Section, 'lessons'> & { lessons: Omit<Lesson, never>[] })[]>([
-    { id: 's1', title: 'Introduction', lessons: [{ id: 'l1', title: '', duration: '10:00', type: 'video' }] },
+  const [sections, setSections] = useState<(Omit<Section, 'lessons'> & { lessons: (Omit<Lesson, never> & { videoUrl?: string })[] })[]>([
+    { id: 's1', title: 'Introduction', lessons: [{ id: 'l1', title: '', duration: '10:00', type: 'video', videoUrl: '' }] },
   ]);
+  const [uploadProgress, setUploadProgress] = useState<{ [key: string]: number }>({});
+  const [abortControllers, setAbortControllers] = useState<{ [key: string]: AbortController }>({});
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const [currentUpload, setCurrentUpload] = useState<{ sectionId: string, lessonId: string } | null>(null);
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [editingLesson, setEditingLesson] = useState<{ sectionId: string, lessonId: string } | null>(null);
 
   const updateField = (key: string, value: string) => setForm(f => ({ ...f, [key]: value }));
 
@@ -79,10 +102,94 @@ export default function UploadCoursePage() {
   };
 
   const removeLesson = (sectionId: string, lessonId: string) => {
+    // Stop upload if in progress
+    if (abortControllers[lessonId]) {
+      abortControllers[lessonId].abort();
+      setAbortControllers(prev => {
+        const next = { ...prev };
+        delete next[lessonId];
+        return next;
+      });
+    }
+    
+    // Clear progress
+    setUploadProgress(prev => {
+      const next = { ...prev };
+      delete next[lessonId];
+      return next;
+    });
+
     setSections(s => s.map(sec => sec.id === sectionId
       ? { ...sec, lessons: sec.lessons.filter(l => l.id !== lessonId) }
       : sec
     ));
+  };
+
+  const handleUploadClick = (sectionId: string, lessonId: string) => {
+    setCurrentUpload({ sectionId, lessonId });
+    if (fileInputRef.current) fileInputRef.current.click();
+  };
+
+  const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file || !currentUpload) return;
+
+    const { sectionId, lessonId } = currentUpload;
+
+    try {
+      const controller = new AbortController();
+      setAbortControllers(prev => ({ ...prev, [lessonId]: controller }));
+      setUploadProgress(prev => ({ ...prev, [lessonId]: 10 }));
+
+      // Generate a unique file name
+      const fileExt = file.name.split('.').pop();
+      const fileName = `temp/${Date.now()}_${lessonId}.${fileExt}`;
+
+      // Upload to storage
+      const { error: uploadError } = await supabase.storage
+        .from('course_videos')
+        .upload(fileName, file, {
+          cacheControl: '3600',
+          upsert: true,
+          // @ts-ignore - Some versions of supabase-js might not type this, but it accepts it
+          abortSignal: controller.signal
+        });
+
+      if (uploadError) throw uploadError;
+
+      setUploadProgress(prev => ({ ...prev, [lessonId]: 80 }));
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('course_videos')
+        .getPublicUrl(fileName);
+
+      // Update local state
+      updateLesson(sectionId, lessonId, 'videoUrl', publicUrl);
+      
+      setUploadProgress(prev => ({ ...prev, [lessonId]: 100 }));
+      setToast({ open: true, message: 'Video uploaded to curriculum!', severity: 'success' });
+
+    } catch (err: any) {
+      if (err.name === 'AbortError') {
+        console.log('Upload aborted');
+        return;
+      }
+      console.error(err);
+      setToast({ open: true, message: err.message || 'Upload failed', severity: 'error' });
+      setUploadProgress(prev => {
+        const next = { ...prev };
+        delete next[lessonId];
+        return next;
+      });
+    } finally {
+      setAbortControllers(prev => {
+        const next = { ...prev };
+        delete next[lessonId];
+        return next;
+      });
+      setCurrentUpload(null);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
   };
 
   const handleSubmit = () => {
@@ -141,9 +248,14 @@ export default function UploadCoursePage() {
           <Typography variant="body1" sx={{ color: 'rgba(255,255,255,0.8)' }}>Share your Ayurveda expertise with thousands of students</Typography>
         </Container>
       </Box>
-
+      <input
+        type="file"
+        ref={fileInputRef}
+        style={{ display: 'none' }}
+        accept="video/*,application/pdf"
+        onChange={handleFileChange}
+      />
       <Container maxWidth="lg" sx={{ py: { xs: 4, md: 6 } }}>
-        {/* Stepper */}
         <Stepper activeStep={activeStep} sx={{ mb: 5, display: { xs: 'none', sm: 'flex' } }}>
           {steps.map(label => (
             <Step key={label}>
@@ -311,32 +423,66 @@ export default function UploadCoursePage() {
                       </Box>
 
                       {section.lessons.map((lesson, li) => (
-                        <Box key={lesson.id} sx={{ display: 'flex', gap: 1, mb: 1, pl: 4, alignItems: 'center', flexWrap: 'wrap' }}>
-                          <Typography variant="caption" color="text.secondary" sx={{ width: 20 }}>{li + 1}.</Typography>
-                          <TextField
-                            size="small"
-                            placeholder="Lesson title"
-                            value={lesson.title}
-                            onChange={e => updateLesson(section.id, lesson.id, 'title', e.target.value)}
-                            sx={{ flex: 1, minWidth: 150 }}
-                          />
-                          <TextField
-                            size="small"
-                            placeholder="Duration"
-                            value={lesson.duration}
-                            onChange={e => updateLesson(section.id, lesson.id, 'duration', e.target.value)}
-                            sx={{ width: 80 }}
-                          />
-                          <FormControl size="small" sx={{ width: 90 }}>
-                            <Select value={lesson.type} onChange={e => updateLesson(section.id, lesson.id, 'type', e.target.value)}>
-                              <MenuItem value="video">📹 Video</MenuItem>
-                              <MenuItem value="pdf">📄 PDF</MenuItem>
-                              <MenuItem value="quiz">❓ Quiz</MenuItem>
-                            </Select>
-                          </FormControl>
-                          <IconButton size="small" color="error" onClick={() => removeLesson(section.id, lesson.id)}>
-                            <DeleteIcon fontSize="small" />
-                          </IconButton>
+                        <Box key={lesson.id}>
+                          <Box sx={{ display: 'flex', gap: 1, mb: 1, pl: 4, alignItems: 'center', flexWrap: 'wrap' }}>
+                            <Typography variant="caption" color="text.secondary" sx={{ width: 20 }}>{li + 1}.</Typography>
+                            <TextField
+                              size="small"
+                              placeholder="Lesson title"
+                              value={lesson.title}
+                              onChange={e => updateLesson(section.id, lesson.id, 'title', e.target.value)}
+                              sx={{ flex: 1, minWidth: 150 }}
+                            />
+                            <TextField
+                              size="small"
+                              placeholder="Duration"
+                              value={lesson.duration}
+                              onChange={e => updateLesson(section.id, lesson.id, 'duration', e.target.value)}
+                              sx={{ width: 80 }}
+                            />
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                              {lesson.videoUrl ? (
+                                <Button 
+                                  size="small" 
+                                  variant="outlined" 
+                                  startIcon={<EditIcon sx={{ fontSize: 16 }} />}
+                                  onClick={() => {
+                                    setEditingLesson({ sectionId: section.id, lessonId: lesson.id });
+                                    setEditDialogOpen(true);
+                                  }}
+                                  sx={{ borderRadius: 2, textTransform: 'none', px: 2 }}
+                                >
+                                  Edit
+                                </Button>
+                              ) : uploadProgress[lesson.id] > 0 ? (
+                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, minWidth: 100 }}>
+                                  <CircularProgress size={16} variant="determinate" value={uploadProgress[lesson.id]} />
+                                  <Typography variant="caption">{uploadProgress[lesson.id]}%</Typography>
+                                </Box>
+                              ) : (
+                                <Button 
+                                  size="small" 
+                                  variant="contained" 
+                                  startIcon={<CloudUploadIcon />}
+                                  onClick={() => handleUploadClick(section.id, lesson.id)}
+                                  sx={{ borderRadius: 2, textTransform: 'none' }}
+                                >
+                                  Upload
+                                </Button>
+                              )}
+                            </Box>
+
+                            <IconButton size="small" color="error" onClick={() => removeLesson(section.id, lesson.id)}>
+                              <DeleteIcon fontSize="small" />
+                            </IconButton>
+                          </Box>
+                          {uploadProgress[lesson.id] > 0 && uploadProgress[lesson.id] < 100 && (
+                            <LinearProgress 
+                              variant="determinate" 
+                              value={uploadProgress[lesson.id]} 
+                              sx={{ ml: 4, mb: 2, height: 4, borderRadius: 2 }} 
+                            />
+                          )}
                         </Box>
                       ))}
 
@@ -406,16 +552,21 @@ export default function UploadCoursePage() {
             variant="outlined"
             onClick={() => activeStep === 0 ? navigate('/creator') : setActiveStep(s => s - 1)}
             sx={{ borderRadius: 2 }}
+            disabled={Object.values(uploadProgress).some(p => p > 0 && p < 100)}
           >
             {activeStep === 0 ? 'Cancel' : 'Back'}
           </Button>
           <Button
             variant="contained"
             color={activeStep === steps.length - 1 ? 'success' : 'primary'}
+            disabled={Object.values(uploadProgress).some(p => p > 0 && p < 100)}
             onClick={() => activeStep === steps.length - 1 ? handleSubmit() : setActiveStep(s => s + 1)}
             sx={{ borderRadius: 2, px: 4, bgcolor: activeStep === steps.length - 1 ? '#16A34A' : undefined }}
           >
-            {activeStep === steps.length - 1 ? '🚀 Submit for Review' : 'Next →'}
+            {Object.values(uploadProgress).some(p => p > 0 && p < 100) 
+              ? <CircularProgress size={24} color="inherit" />
+              : activeStep === steps.length - 1 ? '🚀 Submit for Review' : 'Next →'
+            }
           </Button>
         </Box>
       </Container>
@@ -428,6 +579,51 @@ export default function UploadCoursePage() {
       >
         <Alert severity={toast.severity} sx={{ borderRadius: 2 }}>{toast.message}</Alert>
       </Snackbar>
+      <Dialog 
+        open={editDialogOpen} 
+        onClose={() => setEditDialogOpen(false)}
+        PaperProps={{ sx: { borderRadius: 3, minWidth: 320 } }}
+      >
+        <DialogTitle sx={{ fontWeight: 700, pb: 1 }}>Edit Lecture Content</DialogTitle>
+        <DialogContent sx={{ pt: 2 }}>
+          <Typography variant="body2" color="text.secondary" mb={3}>
+            Manage the media content for this lecture.
+          </Typography>
+          <List sx={{ p: 0 }}>
+            <ListItem disablePadding>
+              <ListItemButton 
+                onClick={() => {
+                  setEditDialogOpen(false);
+                  if (editingLesson) handleUploadClick(editingLesson.sectionId, editingLesson.lessonId);
+                }}
+                sx={{ borderRadius: 2, mb: 1 }}
+              >
+                <ListItemIcon sx={{ minWidth: 40, color: 'primary.main' }}>
+                  <ReplayIcon />
+                </ListItemIcon>
+                <ListItemText primary="Re-upload Content" />
+              </ListItemButton>
+            </ListItem>
+            <ListItem disablePadding>
+              <ListItemButton 
+                onClick={() => {
+                  if (editingLesson) updateLesson(editingLesson.sectionId, editingLesson.lessonId, 'videoUrl', '');
+                  setEditDialogOpen(false);
+                }}
+                sx={{ borderRadius: 2, color: 'error.main' }}
+              >
+                <ListItemIcon sx={{ minWidth: 40, color: 'error.main' }}>
+                  <DeleteIcon />
+                </ListItemIcon>
+                <ListItemText primary="Delete Media Content" />
+              </ListItemButton>
+            </ListItem>
+          </List>
+        </DialogContent>
+        <DialogActions sx={{ p: 2, pt: 0 }}>
+          <Button onClick={() => setEditDialogOpen(false)} color="inherit" sx={{ fontWeight: 600 }}>Cancel</Button>
+        </DialogActions>
+      </Dialog>
     </PageLayout>
   );
 }

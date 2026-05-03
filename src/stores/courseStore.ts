@@ -269,6 +269,7 @@ export const useCourseStore = create<CourseState>()((set, get) => ({
           section_id: sectionId,
           title: lesson.title,
           duration: durationSeconds,
+          video_url: lesson.videoUrl,
           is_preview: false,
           sort_order: lIdx
         };
