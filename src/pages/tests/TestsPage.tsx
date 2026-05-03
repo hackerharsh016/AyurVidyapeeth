@@ -10,7 +10,6 @@ import Button from '@mui/material/Button';
 import Chip from '@mui/material/Chip';
 import TextField from '@mui/material/TextField';
 import InputAdornment from '@mui/material/InputAdornment';
-import CircularProgress from '@mui/material/CircularProgress';
 import Skeleton from '@mui/material/Skeleton';
 import SearchIcon from '@mui/icons-material/Search';
 import TimerIcon from '@mui/icons-material/Timer';
@@ -23,7 +22,6 @@ import { supabase } from '../../supabase/supabase';
 import { useAuthStore } from '../../stores/authStore';
 import { SUBJECTS } from '../../constants/subjects';
 import FormControl from '@mui/material/FormControl';
-import InputLabel from '@mui/material/InputLabel';
 import Select from '@mui/material/Select';
 import MenuItem from '@mui/material/MenuItem';
 

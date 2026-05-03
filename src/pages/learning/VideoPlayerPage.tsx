@@ -11,7 +11,6 @@ import ListItemText from '@mui/material/ListItemText';
 import ListItemButton from '@mui/material/ListItemButton';
 import Button from '@mui/material/Button';
 import LinearProgress from '@mui/material/LinearProgress';
-import Chip from '@mui/material/Chip';
 import IconButton from '@mui/material/IconButton';
 import Tabs from '@mui/material/Tabs';
 import Tab from '@mui/material/Tab';
@@ -28,7 +27,6 @@ import LockIcon from '@mui/icons-material/Lock';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import SkipNextIcon from '@mui/icons-material/SkipNext';
 import SkipPreviousIcon from '@mui/icons-material/SkipPrevious';
-import SpeedIcon from '@mui/icons-material/Speed';
 import { motion } from 'framer-motion';
 import PageLayout from '../../components/PageLayout';
 import { useCourseStore } from '../../stores/courseStore';
@@ -45,14 +43,12 @@ export default function VideoPlayerPage() {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [activeSectionId, setActiveSectionId] = useState('');
   const [playing, setPlaying] = useState(false);
-  const [fakeProgress, setFakeProgress] = useState(0);
   const [tab, setTab] = useState(0);
   const [toast, setToast] = useState<{
     open: boolean;
     message: string;
     severity: 'success' | 'error' | 'info' | 'warning';
   }>({ open: false, message: '', severity: 'info' });
-  const [speed, setSpeed] = useState(1);
   const [notes, setNotes] = useState('');
   const [showCongrats, setShowCongrats] = useState(false);
 
@@ -109,17 +105,9 @@ export default function VideoPlayerPage() {
     }
   }, [playing, activeLesson]);
 
-  useEffect(() => {
-    if (videoRef.current) {
-      videoRef.current.playbackRate = speed;
-    }
-  }, [speed]);
 
   const handleTimeUpdate = () => {
-    if (videoRef.current) {
-      const p = (videoRef.current.currentTime / videoRef.current.duration) * 100;
-      setFakeProgress(p || 0);
-    }
+    // Progress is synced via interval, but we can use this for immediate UI updates if needed
   };
 
   const handleEnded = () => {
@@ -127,12 +115,6 @@ export default function VideoPlayerPage() {
     handleMarkComplete();
   };
 
-  const formatTime = (seconds: number) => {
-    if (isNaN(seconds)) return '0:00';
-    const m = Math.floor(seconds / 60);
-    const s = Math.floor(seconds % 60);
-    return `${m}:${s.toString().padStart(2, '0')}`;
-  };
 
   if (!course) {
     return (
@@ -169,7 +151,6 @@ export default function VideoPlayerPage() {
     setActiveLesson(lesson);
     setActiveSectionId(sectionId);
     setPlaying(false);
-    setFakeProgress(isCompleted(courseId || '', lesson.id) ? 100 : 0);
     setCurrentLesson(courseId || '', lesson.id);
   };
 

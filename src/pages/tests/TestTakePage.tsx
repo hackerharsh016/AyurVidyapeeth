@@ -37,7 +37,7 @@ interface Question {
   correct_option: string;
   marks: number;
   explanation: string | null;
-  sort_order: number;
+  sort_order: number | null;
 }
 
 interface Test {
@@ -83,7 +83,7 @@ export default function TestTakePage() {
     return () => { if (timerRef.current) clearInterval(timerRef.current); };
   }, [id]);
 
-  const handleSubmit = useCallback(async (auto = false) => {
+  const handleSubmit = useCallback(async () => {
     if (timerRef.current) clearInterval(timerRef.current);
     setConfirmSubmit(false);
     const timeTaken = Math.floor((Date.now() - startTime) / 1000);
@@ -114,7 +114,7 @@ export default function TestTakePage() {
     if (phase !== 'exam') return;
     timerRef.current = setInterval(() => {
       setTimeLeft(t => {
-        if (t <= 1) { handleSubmit(true); return 0; }
+        if (t <= 1) { handleSubmit(); return 0; }
         return t - 1;
       });
     }, 1000);

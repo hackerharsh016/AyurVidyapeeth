@@ -9,6 +9,7 @@ import CardContent from '@mui/material/CardContent';
 import Button from '@mui/material/Button';
 import Chip from '@mui/material/Chip';
 import Paper from '@mui/material/Paper';
+import Divider from '@mui/material/Divider';
 import TextField from '@mui/material/TextField';
 import Dialog from '@mui/material/Dialog';
 import DialogTitle from '@mui/material/DialogTitle';
@@ -19,7 +20,6 @@ import Select from '@mui/material/Select';
 import MenuItem from '@mui/material/MenuItem';
 import FormControl from '@mui/material/FormControl';
 import InputLabel from '@mui/material/InputLabel';
-import Divider from '@mui/material/Divider';
 import CircularProgress from '@mui/material/CircularProgress';
 import Snackbar from '@mui/material/Snackbar';
 import Alert from '@mui/material/Alert';
@@ -47,8 +47,8 @@ interface Question {
   option_d: string;
   correct_option: string;
   marks: number;
-  explanation: string;
-  sort_order: number;
+  explanation: string | null;
+  sort_order: number | null;
 }
 
 interface Test {
@@ -124,12 +124,13 @@ export default function ManageTestsPage() {
   const saveTest = async () => {
     if (!user) return;
     setSaving(true);
-    const payload = { ...testForm, creator_id: user.id };
+    const { id, created_at, _question_count, ...cleanPayload } = testForm;
+    const payload = { ...cleanPayload, creator_id: user.id };
     let err;
     if (editingTest?.id) {
       ({ error: err } = await supabase.from('tests').update(payload).eq('id', editingTest.id));
     } else {
-      ({ error: err } = await supabase.from('tests').insert(payload));
+      ({ error: err } = await supabase.from('tests').insert([payload]));
     }
     setSaving(false);
     if (err) { showToast(err.message, 'error'); return; }
@@ -176,7 +177,7 @@ export default function ManageTestsPage() {
     await supabase.from('test_questions').delete().eq('test_id', activeTestId);
     
     const payload = questions.map((q, i) => {
-      const { id, ...questionData } = q;
+      const { id: qId, created_at: qAt, ...questionData } = q as any;
       return {
         ...questionData,
         test_id: activeTestId,

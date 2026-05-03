@@ -1,8 +1,9 @@
-import { BrowserRouter, Routes, Route, useLocation } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, useLocation, useNavigate } from 'react-router-dom';
 import { ThemeProvider } from '@mui/material/styles';
 import CssBaseline from '@mui/material/CssBaseline';
 import { AnimatePresence, motion } from 'framer-motion';
 import { useEffect } from 'react';
+import { App as CapApp } from '@capacitor/app';
 import theme from './theme';
 import { useAuthStore } from './stores/authStore';
 import { useCourseStore } from './stores/courseStore';
@@ -67,6 +68,29 @@ function AnimatedRoutes() {
   );
 }
 
+function CapacitorManager() {
+  const navigate = useNavigate();
+  const location = useLocation();
+
+  useEffect(() => {
+    const backListener = CapApp.addListener('backButton', ({ canGoBack }) => {
+      if (location.pathname === '/') {
+        CapApp.exitApp();
+      } else if (canGoBack) {
+        window.history.back();
+      } else {
+        navigate('/');
+      }
+    });
+
+    return () => {
+      backListener.then(l => l.remove());
+    };
+  }, [navigate, location]);
+
+  return null;
+}
+
 function App() {
   const { initializeSession } = useAuthStore();
   const { fetchCourses, fetchUserEnrollments, fetchWishlist, fetchTestimonials } = useCourseStore();
@@ -94,6 +118,7 @@ function App() {
     <ThemeProvider theme={theme}>
       <CssBaseline />
       <BrowserRouter>
+        <CapacitorManager />
         <AnimatedRoutes />
       </BrowserRouter>
     </ThemeProvider>

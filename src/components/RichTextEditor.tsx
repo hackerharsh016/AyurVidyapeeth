@@ -19,26 +19,15 @@ import FormatListBulletedIcon from '@mui/icons-material/FormatListBulleted';
 import FormatListNumberedIcon from '@mui/icons-material/FormatListNumbered';
 import FormatQuoteIcon from '@mui/icons-material/FormatQuote';
 import ImageIcon from '@mui/icons-material/Image';
-import LinkIcon from '@mui/icons-material/Link';
 import FormatColorTextIcon from '@mui/icons-material/FormatColorText';
 import UndoIcon from '@mui/icons-material/Undo';
 import RedoIcon from '@mui/icons-material/Redo';
-import TitleIcon from '@mui/icons-material/Title';
 
 interface RichTextEditorProps {
   value: string;
   onChange: (html: string) => void;
   placeholder?: string;
 }
-
-const FONT_SIZES = [
-  { label: 'Small', value: '0.875rem' },
-  { label: 'Normal', value: '1rem' },
-  { label: 'Large', value: '1.25rem' },
-  { label: 'Heading 3', value: 'h3' },
-  { label: 'Heading 2', value: 'h2' },
-  { label: 'Heading 1', value: 'h1' },
-];
 
 const TEXT_COLORS = [
   '#111827', '#0E5B44', '#1D4ED8', '#DC2626',
