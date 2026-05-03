@@ -86,17 +86,16 @@ export default function Navbar() {
                 width: 36,
                 height: 36,
                 borderRadius: 2,
-                bgcolor: 'primary.main',
+                overflow: 'hidden',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                fontSize: '1.2rem',
               }}
             >
-              🌿
+              <img src="/srotoayurveda_logo.jpeg" alt="Srotaayurveda Logo" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
             </Box>
             <Typography variant="h6" sx={{ fontWeight: 700, color: 'primary.main', letterSpacing: '-0.01em' }}>
-              AyurVidyapeeth
+              Srotaayurveda
             </Typography>
           </Box>
 
@@ -138,6 +137,7 @@ export default function Navbar() {
               <>
                 <IconButton onClick={handleMenuOpen} sx={{ p: 0.5 }}>
                   <Avatar
+                    src={(user?.avatar?.startsWith('http') || user?.avatar?.startsWith('/')) ? user.avatar : undefined}
                     sx={{
                       bgcolor: 'primary.main',
                       width: 36,
@@ -146,7 +146,7 @@ export default function Navbar() {
                       fontWeight: 700,
                     }}
                   >
-                    {user?.avatar}
+                    {user?.name?.slice(0, 2).toUpperCase()}
                   </Avatar>
                 </IconButton>
                 <Menu
@@ -268,11 +268,11 @@ export default function Navbar() {
             to="/"
             sx={{ display: 'flex', alignItems: 'center', gap: 1, textDecoration: 'none' }}
           >
-            <Box sx={{ width: 28, height: 28, borderRadius: 1.5, bgcolor: 'primary.main', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.9rem' }}>
-              🌿
+            <Box sx={{ width: 28, height: 28, borderRadius: 1.5, overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <img src="/srotoayurveda_logo.jpeg" alt="Srotaayurveda Logo" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
             </Box>
             <Typography variant="subtitle1" sx={{ fontWeight: 700, color: 'primary.main' }}>
-              AyurVidyapeeth
+              Srotaayurveda
             </Typography>
           </Box>
           {isAuthenticated ? (

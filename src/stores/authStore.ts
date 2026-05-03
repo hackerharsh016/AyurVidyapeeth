@@ -47,7 +47,7 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
             year: profile.year || '',
             role: (profile.role as 'student' | 'creator' | 'admin') || 'student',
             avatar: profile.avatar_url || '',
-            bio: '',
+            bio: profile.bio || '',
           },
           isAuthenticated: true,
         });
@@ -98,11 +98,20 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
     const current = get().user;
     if (!current) return;
     
-    await supabase.from('profiles').update({
+    console.log('Updating profile for user:', current.id, 'with data:', data);
+
+    const { error } = await supabase.from('profiles').update({
       full_name: data.name,
       college: data.college,
       year: data.year,
+      bio: data.bio,
+      avatar_url: data.avatar,
     }).eq('id', current.id);
+    
+    if (error) {
+      console.error('Error updating profile:', error);
+      throw error;
+    }
     
     await get().initializeSession();
   },

@@ -115,9 +115,11 @@ export default function AuthModal({ open, mode, onClose, onSwitchMode }: Props) 
           >
             <CloseIcon />
           </IconButton>
-          <Typography sx={{ fontSize: '2rem', mb: 0.5 }}>🌿</Typography>
+          <Box sx={{ width: 48, height: 48, borderRadius: 2, overflow: 'hidden', mx: 'auto', mb: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <img src="/srotoayurveda_logo.jpeg" alt="Srotaayurveda Logo" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+          </Box>
           <Typography variant="h6" sx={{ color: 'white', fontWeight: 700 }}>
-            {mode === 'login' ? 'Welcome Back' : 'Join AyurVidyapeeth'}
+            {mode === 'login' ? 'Welcome Back' : 'Join Srotaayurveda'}
           </Typography>
           <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.8)', mt: 0.5 }}>
             {mode === 'login' ? 'Sign in to continue learning' : 'Start your Ayurveda journey today'}

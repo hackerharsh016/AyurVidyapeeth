@@ -41,6 +41,8 @@ export interface Course {
   totalPdfs: number;
   status: 'published' | 'pending' | 'draft';
   creatorId: string;
+  validityMonths?: number;
+  createdAt?: string;
 }
 
 export interface Review {

@@ -34,10 +34,8 @@ import ReplayIcon from '@mui/icons-material/Replay';
 import AddIcon from '@mui/icons-material/Add';
 import DeleteIcon from '@mui/icons-material/Delete';
 import CloudUploadIcon from '@mui/icons-material/CloudUpload';
-import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import CircularProgress from '@mui/material/CircularProgress';
 import LinearProgress from '@mui/material/LinearProgress';
-import Tooltip from '@mui/material/Tooltip';
 import { supabase } from '../../supabase/supabase';
 import { motion, AnimatePresence } from 'framer-motion';
 import PageLayout from '../../components/PageLayout';
@@ -65,7 +63,9 @@ export default function UploadCoursePage() {
     language: 'English',
     description: '',
     whatYouLearn: ['', '', '', ''],
-    hasCertificate: false,
+    hasCertificate: true,
+    validityMonths: 12,
+    thumbnail: '',
   });
 
   const [sections, setSections] = useState<(Omit<Section, 'lessons'> & { lessons: (Omit<Lesson, never> & { videoUrl?: string })[] })[]>([
@@ -77,6 +77,8 @@ export default function UploadCoursePage() {
   const [currentUpload, setCurrentUpload] = useState<{ sectionId: string, lessonId: string } | null>(null);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [editingLesson, setEditingLesson] = useState<{ sectionId: string, lessonId: string } | null>(null);
+  const [thumbnailUploading, setThumbnailUploading] = useState(false);
+  const thumbnailInputRef = useRef<HTMLInputElement | null>(null);
 
   const updateField = (key: string, value: string) => setForm(f => ({ ...f, [key]: value }));
 
@@ -85,7 +87,7 @@ export default function UploadCoursePage() {
     setSections(s => [...s, { id, title: 'New Section', lessons: [{ id: `l${Date.now()}`, title: '', duration: '10:00', type: 'video' }] }]);
   };
 
-  const removeSection = (id: string) => setSections(s => s.filter(sec => sec.id !== id));
+
 
   const addLesson = (sectionId: string) => {
     setSections(s => s.map(sec => sec.id === sectionId
@@ -101,8 +103,8 @@ export default function UploadCoursePage() {
     ));
   };
 
-  const removeLesson = (sectionId: string, lessonId: string) => {
-    // Stop upload if in progress
+  const removeLesson = async (sectionId: string, lessonId: string) => {
+    // 1. Stop upload if in progress
     if (abortControllers[lessonId]) {
       abortControllers[lessonId].abort();
       setAbortControllers(prev => {
@@ -112,7 +114,18 @@ export default function UploadCoursePage() {
       });
     }
     
-    // Clear progress
+    // 2. Delete from storage if already uploaded
+    const section = sections.find(s => s.id === sectionId);
+    const lesson = section?.lessons.find(l => l.id === lessonId);
+    if (lesson?.videoUrl) {
+      const urlParts = lesson.videoUrl.split('/course_videos/');
+      if (urlParts.length > 1) {
+        const filePath = urlParts[1];
+        await supabase.storage.from('course_videos').remove([filePath]);
+      }
+    }
+
+    // 3. Clear progress
     setUploadProgress(prev => {
       const next = { ...prev };
       delete next[lessonId];
@@ -123,6 +136,25 @@ export default function UploadCoursePage() {
       ? { ...sec, lessons: sec.lessons.filter(l => l.id !== lessonId) }
       : sec
     ));
+  };
+
+  const removeSection = async (id: string) => {
+    // Delete all videos in this section from storage
+    const section = sections.find(s => s.id === id);
+    if (section) {
+      const filesToRemove = section.lessons
+        .filter(l => l.videoUrl)
+        .map(l => {
+          const parts = l.videoUrl!.split('/course_videos/');
+          return parts.length > 1 ? parts[1] : null;
+        })
+        .filter(Boolean) as string[];
+      
+      if (filesToRemove.length > 0) {
+        await supabase.storage.from('course_videos').remove(filesToRemove);
+      }
+    }
+    setSections(s => s.filter(sec => sec.id !== id));
   };
 
   const handleUploadClick = (sectionId: string, lessonId: string) => {
@@ -192,6 +224,37 @@ export default function UploadCoursePage() {
     }
   };
 
+  const handleThumbnailUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file || !user) return;
+
+    try {
+      setThumbnailUploading(true);
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${user.id}_${Date.now()}.${fileExt}`;
+      const filePath = `${fileName}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from('course-thumbnails')
+        .upload(filePath, file, { upsert: true });
+
+      if (uploadError) throw uploadError;
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('course-thumbnails')
+        .getPublicUrl(filePath);
+
+      setForm(f => ({ ...f, thumbnail: publicUrl }));
+      setToast({ open: true, message: 'Course thumbnail uploaded!', severity: 'success' });
+    } catch (err: any) {
+      console.error(err);
+      setToast({ open: true, message: err.message || 'Upload failed', severity: 'error' });
+    } finally {
+      setThumbnailUploading(false);
+      if (thumbnailInputRef.current) thumbnailInputRef.current.value = '';
+    }
+  };
+
   const handleSubmit = () => {
     if (!form.title || !form.description) {
       setToast({ open: true, message: 'Please fill in all required fields', severity: 'error' });
@@ -205,7 +268,7 @@ export default function UploadCoursePage() {
       instructor: user?.name || 'Unknown',
       instructorBio: user?.bio || '',
       instructorAvatar: user?.avatar || 'AV',
-      thumbnail: '/api/placeholder/400/225',
+      thumbnail: form.thumbnail || '/api/placeholder/400/225',
       price: parseFloat(form.price) || 0,
       originalPrice: parseFloat(form.price) * 1.5 || 0,
       rating: 0,
@@ -226,6 +289,7 @@ export default function UploadCoursePage() {
       category: form.category,
       free: parseFloat(form.price) === 0,
       certificate: form.hasCertificate,
+      validityMonths: form.validityMonths,
       totalLessons: sections.reduce((sum, s) => sum + s.lessons.length, 0),
       totalPdfs: 0,
       status: 'pending',
@@ -281,6 +345,61 @@ export default function UploadCoursePage() {
                     <Grid size={12}>
                       <TextField label="Course Subtitle *" value={form.subtitle} onChange={e => updateField('subtitle', e.target.value)} fullWidth helperText="A brief one-liner about your course" />
                     </Grid>
+                    
+                    <Grid size={12}>
+                      <Typography variant="subtitle2" fontWeight={700} mb={1}>Course Thumbnail *</Typography>
+                      <Box sx={{ 
+                        display: 'flex', 
+                        flexDirection: { xs: 'column', sm: 'row' }, 
+                        gap: 3, 
+                        alignItems: 'center',
+                        p: 2,
+                        border: '1px dashed',
+                        borderColor: 'divider',
+                        borderRadius: 3,
+                        bgcolor: 'rgba(0,0,0,0.01)'
+                      }}>
+                        <Box sx={{ 
+                          width: { xs: '100%', sm: 240 }, 
+                          height: 135, 
+                          borderRadius: 2, 
+                          overflow: 'hidden', 
+                          bgcolor: 'grey.100',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          border: '1px solid',
+                          borderColor: 'divider'
+                        }}>
+                          {form.thumbnail ? (
+                            <img src={form.thumbnail} alt="Preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                          ) : (
+                            <Typography variant="caption" color="text.secondary">No thumbnail uploaded</Typography>
+                          )}
+                        </Box>
+                        <Box sx={{ flex: 1, textAlign: { xs: 'center', sm: 'left' } }}>
+                          <input
+                            type="file"
+                            accept="image/*"
+                            ref={thumbnailInputRef}
+                            style={{ display: 'none' }}
+                            onChange={handleThumbnailUpload}
+                          />
+                          <Button 
+                            variant="outlined" 
+                            startIcon={thumbnailUploading ? <CircularProgress size={20} /> : <CloudUploadIcon />}
+                            onClick={() => thumbnailInputRef.current?.click()}
+                            disabled={thumbnailUploading}
+                            sx={{ mb: 1, borderRadius: 2 }}
+                          >
+                            {form.thumbnail ? 'Change Thumbnail' : 'Upload Thumbnail'}
+                          </Button>
+                          <Typography variant="caption" display="block" color="text.secondary">
+                            Recommended size: 1280x720 (16:9 ratio). Max 2MB.
+                          </Typography>
+                        </Box>
+                      </Box>
+                    </Grid>
                     <Grid size={{ xs: 12, sm: 6 }}>
                       <FormControl fullWidth>
                         <InputLabel>Subject</InputLabel>
@@ -316,6 +435,15 @@ export default function UploadCoursePage() {
                         <Select value={form.language} onChange={e => updateField('language', e.target.value)} label="Language">
                           {['English', 'Hindi', 'Hindi + English', 'Sanskrit + English', 'Tamil', 'Malayalam'].map(l => <MenuItem key={l} value={l}>{l}</MenuItem>)}
                         </Select>
+                      </FormControl>
+                    </Grid>
+                    <Grid size={{ xs: 12, sm: 6 }}>
+                      <FormControl fullWidth>
+                        <InputLabel>Course Validity</InputLabel>
+                        <Select value={form.validityMonths} onChange={e => setForm(f => ({ ...f, validityMonths: Number(e.target.value) }))} label="Course Validity">
+                          {[6, 12, 24].map(v => <MenuItem key={v} value={v}>{v} Months</MenuItem>)}
+                        </Select>
+                        <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5, display: 'block' }}>Course cannot be deleted if active students exist within this period.</Typography>
                       </FormControl>
                     </Grid>
                     <Grid size={12}>
@@ -515,6 +643,7 @@ export default function UploadCoursePage() {
                       { label: 'Price', value: form.price ? `₹${form.price}` : 'Free' },
                       { label: 'Language', value: form.language },
                       { label: 'Certificate', value: form.hasCertificate ? 'Yes' : 'No' },
+                      { label: 'Validity', value: `${form.validityMonths} Months` },
                       { label: 'Total Sections', value: sections.length.toString() },
                       { label: 'Total Lessons', value: sections.reduce((sum, s) => sum + s.lessons.length, 0).toString() },
                     ].map(item => (

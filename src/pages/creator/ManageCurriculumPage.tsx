@@ -113,6 +113,24 @@ export default function ManageCurriculumPage() {
 
   const handleDeleteMedia = async (lessonId: string) => {
     try {
+      // 1. Get current video URL to find the storage path
+      const { data: lesson } = await supabase
+        .from('lessons')
+        .select('video_url')
+        .eq('id', lessonId)
+        .single();
+
+      if (lesson?.video_url) {
+        // Extract storage path from URL
+        // URL format: .../storage/v1/object/public/course_videos/COURSE_ID/FILE_NAME
+        const urlParts = lesson.video_url.split('/course_videos/');
+        if (urlParts.length > 1) {
+          const filePath = urlParts[1];
+          await supabase.storage.from('course_videos').remove([filePath]);
+        }
+      }
+
+      // 2. Update database
       const { error } = await supabase
         .from('lessons')
         .update({ video_url: null })

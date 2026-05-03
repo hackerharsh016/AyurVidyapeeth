@@ -33,6 +33,8 @@ interface CourseState {
   isWishlisted: (courseId: string) => boolean;
   getCourseById: (id: string) => Course | undefined;
   addCourse: (course: Course) => Promise<void>;
+  updateCourse: (courseId: string, updates: Partial<Course>) => Promise<void>;
+  deleteCourse: (courseId: string) => Promise<void>;
   updateCourseStatus: (courseId: string, status: Course['status']) => Promise<void>;
 }
 
@@ -45,7 +47,22 @@ export const useCourseStore = create<CourseState>()((set, get) => ({
   fetchCourses: async () => {
     const { data: dbCourses } = await supabase
       .from('courses')
-      .select('*, profiles(full_name, avatar_url), course_sections(*, lessons(*)), reviews(*, profiles(full_name, avatar_url))');
+      .select(`
+        *,
+        profiles(full_name, avatar_url),
+        course_sections(
+          *,
+          lessons(
+            id,
+            title,
+            duration,
+            video_url,
+            is_preview,
+            sort_order
+          )
+        ),
+        reviews(*, profiles(full_name, avatar_url))
+      `);
     
     if (dbCourses) {
       const mapped = dbCourses.map((c: any) => {
@@ -99,7 +116,7 @@ export const useCourseStore = create<CourseState>()((set, get) => ({
           instructor: c.profiles?.full_name || 'Instructor',
           instructorAvatar: c.profiles?.full_name ? c.profiles.full_name.split(' ').map((n: string) => n[0]).join('').toUpperCase() : 'I',
           price: Number(c.price) || 0,
-          originalPrice: c.price ? Number(c.price) * 1.5 : 0, 
+          originalPrice: Number(c.original_price) || (c.price ? Number(c.price) * 1.5 : 0), 
           thumbnail: c.thumbnail_url || 'https://images.unsplash.com/photo-1544367567-0f2fcb009e0b?auto=format&fit=crop&w=400&q=80',
           rating: avgRating,
           students: c.students_count || reviews.length, 
@@ -117,6 +134,8 @@ export const useCourseStore = create<CourseState>()((set, get) => ({
           subject: c.subject ?? c.category ?? 'Ayurveda',
           free: Number(c.price) === 0,
           creatorId: c.creator_id,
+          validityMonths: c.validity_months || 12,
+          createdAt: c.created_at,
         };
       }) as Course[];
       set({ courses: mapped });
@@ -228,10 +247,12 @@ export const useCourseStore = create<CourseState>()((set, get) => ({
       subject: course.subject,
       level: course.level,
       price: course.price,
+      original_price: course.originalPrice || course.price,
       language: course.language,
       what_you_learn: course.whatYouLearn,
       total_lessons: course.totalLessons,
       has_certificate: course.certificate,
+      validity_months: course.validityMonths || 12,
       status: 'pending' // new courses go to pending
     }).select('id').single();
     
@@ -282,6 +303,71 @@ export const useCourseStore = create<CourseState>()((set, get) => ({
     }
     
     await get().fetchCourses();
+  },
+
+  updateCourse: async (courseId: string, updates: Partial<Course>) => {
+    const dbUpdates: any = {};
+    if (updates.title !== undefined) dbUpdates.title = updates.title;
+    if (updates.subtitle !== undefined) dbUpdates.subtitle = updates.subtitle;
+    if (updates.description !== undefined) dbUpdates.description = updates.description;
+    if (updates.price !== undefined) dbUpdates.price = updates.price;
+    if (updates.originalPrice !== undefined) dbUpdates.original_price = updates.originalPrice;
+    if (updates.category !== undefined) dbUpdates.category = updates.category;
+    if (updates.level !== undefined) dbUpdates.level = updates.level;
+    if (updates.language !== undefined) dbUpdates.language = updates.language;
+    if (updates.certificate !== undefined) dbUpdates.has_certificate = updates.certificate;
+    if (updates.thumbnail !== undefined) dbUpdates.thumbnail_url = updates.thumbnail;
+    if (updates.validityMonths !== undefined) dbUpdates.validity_months = updates.validityMonths;
+
+    const { error } = await supabase.from('courses').update(dbUpdates).eq('id', courseId);
+    if (error) console.error('Error updating course:', error);
+    await get().fetchCourses();
+  },
+
+  deleteCourse: async (courseId: string) => {
+    try {
+      const course = get().courses.find(c => c.id === courseId);
+      if (!course) return;
+
+      // Check for active students
+      // Logic: If students > 0, check if validity has passed
+      if (course.students > 0) {
+        const createdAt = new Date(course.createdAt || new Date());
+        const validityMonths = course.validityMonths || 12;
+        const expiryDate = new Date(createdAt);
+        expiryDate.setMonth(expiryDate.getMonth() + validityMonths);
+
+        const now = new Date();
+        if (now < expiryDate) {
+          throw new Error(`Cannot delete course with active enrolled students. This course is valid until ${expiryDate.toLocaleDateString()}. You can only delete it if students are zero or validity has ended.`);
+        }
+      }
+
+      // 1. Delete videos from storage
+      // In ManageCurriculumPage, files are stored as: `${course.id}/${selectedLessonId}_${Date.now()}.${fileExt}`
+      // So we can list all files in the course folder and delete them.
+      const { data: files, error: listError } = await supabase.storage
+        .from('course_videos')
+        .list(courseId);
+
+      if (!listError && files && files.length > 0) {
+        const filesToRemove = files.map(f => `${courseId}/${f.name}`);
+        const { error: removeError } = await supabase.storage
+          .from('course_videos')
+          .remove(filesToRemove);
+        
+        if (removeError) console.error('Error removing course videos:', removeError);
+      }
+
+      // 2. Delete from database (cascading deletes will handle lessons/sections)
+      const { error } = await supabase.from('courses').delete().eq('id', courseId);
+      if (error) throw error;
+
+    } catch (err) {
+      console.error('Error in deleteCourse:', err);
+    } finally {
+      await get().fetchCourses();
+    }
   },
 
   updateCourseStatus: async (courseId: string, status: Course['status']) => {

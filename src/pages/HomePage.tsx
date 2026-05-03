@@ -69,12 +69,6 @@ export default function HomePage() {
   const publishedCourses = useMemo(() => courses.filter(c => c.status === 'published'), [courses]);
   const featuredCourses = useMemo(() => publishedCourses.slice(0, 6), [publishedCourses]);
   
-  const stats = useMemo(() => [
-    { value: `${publishedCourses.length}+`, label: 'Expert Courses' },
-    { value: '50,000+', label: 'Students' },
-    { value: `${new Set(courses.map(c => c.creatorId)).size}+`, label: 'Expert Educators' },
-    { value: '100%', label: 'BAMS Aligned' },
-  ], [publishedCourses.length, courses]);
 
   return (
     <PageLayout>
@@ -107,8 +101,8 @@ export default function HomePage() {
         <Box sx={{ position: 'absolute', bottom: -150, left: -80, width: 500, height: 500, borderRadius: '50%', bgcolor: 'rgba(255,255,255,0.04)', pointerEvents: 'none' }} />
 
         <Container maxWidth="lg" sx={{ position: 'relative', zIndex: 1 }}>
-          <Grid container spacing={4} alignItems="center">
-            <Grid size={{ xs: 12, md: 7 }}>
+          <Grid container spacing={4} justifyContent="center">
+            <Grid size={{ xs: 12, md: 9, lg: 8 }} sx={{ textAlign: { xs: 'left', md: 'center' } }}>
               <motion.div
                 initial={{ opacity: 0, y: 40 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -140,13 +134,21 @@ export default function HomePage() {
                 </Typography>
                 <Typography
                   variant="h6"
-                  sx={{ color: 'rgba(255,255,255,0.8)', mb: 4, fontWeight: 400, lineHeight: 1.6, fontSize: { xs: '1rem', md: '1.1rem' } }}
+                  sx={{ 
+                    color: 'rgba(255,255,255,0.8)', 
+                    mb: 4, 
+                    fontWeight: 400, 
+                    lineHeight: 1.6, 
+                    fontSize: { xs: '1rem', md: '1.1rem' },
+                    maxWidth: 700,
+                    mx: { xs: 0, md: 'auto' }
+                  }}
                 >
                   Master Ayurvedic science with structured courses from India's top educators.
                   From Srotas to Samhitas — your complete learning ecosystem.
                 </Typography>
 
-                <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
+                <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', justifyContent: { xs: 'flex-start', md: 'center' } }}>
                   <Button
                     variant="contained"
                     size="large"
@@ -180,75 +182,9 @@ export default function HomePage() {
                     📚 Browse Srotas
                   </Button>
                 </Box>
-
-                {/* Social proof */}
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mt: 4, flexWrap: 'wrap' }}>
-                  <Box sx={{ display: 'flex' }}>
-                    {['AK', 'PS', 'RN', 'MG', 'SK'].map((av, i) => (
-                      <Avatar
-                        key={i}
-                        sx={{
-                          width: 32,
-                          height: 32,
-                          fontSize: '0.65rem',
-                          fontWeight: 700,
-                          border: '2px solid #0E5B44',
-                          ml: i > 0 ? -1 : 0,
-                          bgcolor: ['#1A8060', '#D4A017', '#22C55E', '#0891B2', '#7C3AED'][i],
-                        }}
-                      >
-                        {av}
-                      </Avatar>
-                    ))}
-                  </Box>
-                  <Box>
-                    <Rating value={4.9} readOnly precision={0.1} size="small" sx={{ color: '#D4A017' }} />
-                    <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.8)', display: 'block' }}>
-                      Trusted by 50,000+ Ayurveda students
-                    </Typography>
-                  </Box>
-                </Box>
               </motion.div>
             </Grid>
 
-            <Grid size={{ xs: 12, md: 5 }}>
-              <motion.div
-                initial={{ opacity: 0, scale: 0.9 }}
-                animate={{ opacity: 1, scale: 1 }}
-                transition={{ duration: 0.7, delay: 0.2 }}
-              >
-                {/* Stats Cards */}
-                <Grid container spacing={2}>
-                  {stats.map((stat, i) => (
-                    <Grid key={i} size={6}>
-                      <motion.div
-                        initial={{ opacity: 0, y: 20 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ delay: 0.3 + i * 0.1 }}
-                      >
-                        <Box
-                          sx={{
-                            bgcolor: 'rgba(255,255,255,0.1)',
-                            backdropFilter: 'blur(10px)',
-                            border: '1px solid rgba(255,255,255,0.15)',
-                            borderRadius: 3,
-                            p: 2.5,
-                            textAlign: 'center',
-                          }}
-                        >
-                          <Typography variant="h4" sx={{ color: '#D4A017', fontWeight: 700, fontSize: '1.8rem' }}>
-                            {stat.value}
-                          </Typography>
-                          <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.75)' }}>
-                            {stat.label}
-                          </Typography>
-                        </Box>
-                      </motion.div>
-                    </Grid>
-                  ))}
-                </Grid>
-              </motion.div>
-            </Grid>
           </Grid>
         </Container>
       </Box>
@@ -556,10 +492,10 @@ export default function HomePage() {
           <Grid container spacing={4}>
             <Grid size={{ xs: 12, md: 4 }}>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
-                <Box sx={{ width: 32, height: 32, borderRadius: 2, bgcolor: '#1A8060', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1rem' }}>
-                  🌿
+                <Box sx={{ width: 32, height: 32, borderRadius: 2, overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <img src="/srotoayurveda_logo.jpeg" alt="Srotaayurveda Logo" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                 </Box>
-                <Typography variant="h6" sx={{ color: 'white', fontWeight: 700 }}>AyurVidyapeeth</Typography>
+                <Typography variant="h6" sx={{ color: 'white', fontWeight: 700 }}>Srotaayurveda</Typography>
               </Box>
               <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.6)', lineHeight: 1.7 }}>
                 India's premier platform for Ayurveda education. Bringing classical wisdom to modern learners.
@@ -598,7 +534,7 @@ export default function HomePage() {
           </Grid>
           <Box sx={{ borderTop: '1px solid rgba(255,255,255,0.1)', mt: 4, pt: 3, textAlign: 'center' }}>
             <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.4)' }}>
-              © 2024 AyurVidyapeeth. All rights reserved. Made with 🌿 for Ayurveda learners.
+              © 2024 Srotaayurveda. All rights reserved. Made with ❤️ for Ayurveda learners.
             </Typography>
           </Box>
         </Container>

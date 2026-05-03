@@ -60,7 +60,7 @@ export default function LearningPage() {
         courseName: course.title,
         date: new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' }),
         certificateId: `CERT-${course.id.substring(0, 8)}-${user.id.substring(0, 4)}`.toUpperCase(),
-        creatorName: course.instructor || "AyurVidyapeeth Expert"
+        creatorName: course.instructor || "Srotaayurveda Expert"
       });
 
       // 3. Trigger Download
@@ -162,10 +162,19 @@ export default function LearningPage() {
                               position: 'relative',
                             }}
                           >
-                            🌿
+                             <img src="/srotoayurveda_logo.jpeg" alt="Logo" style={{ width: 64, height: 64, objectFit: 'cover', borderRadius: 8 }} />
                             {progress === 100 && (
                               <Box sx={{ position: 'absolute', top: 10, right: 10, bgcolor: '#16A34A', borderRadius: 2, px: 1, py: 0.25 }}>
                                 <Typography variant="caption" sx={{ color: 'white', fontWeight: 700 }}>✓ Complete</Typography>
+                              </Box>
+                            )}
+                            {course.certificate && (
+                              <Box sx={{ position: 'absolute', bottom: 10, right: 10 }}>
+                                <Chip 
+                                  label="Certificate of Completion" 
+                                  size="small" 
+                                  sx={{ bgcolor: 'rgba(212,160,23,0.9)', color: 'white', fontWeight: 600, fontSize: '0.6rem', height: 18 }} 
+                                />
                               </Box>
                             )}
                           </Box>
@@ -252,7 +261,7 @@ export default function LearningPage() {
                     <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.08 }}>
                       <Card sx={{ cursor: 'pointer' }} onClick={() => navigate(`/courses/${course.id}`)}>
                         <Box sx={{ height: 120, background: 'linear-gradient(135deg, #0E5B44, #1A8060)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '2.5rem' }}>
-                          🌿
+                           <img src="/srotoayurveda_logo.jpeg" alt="Logo" style={{ width: 56, height: 56, objectFit: 'cover', borderRadius: 8 }} />
                         </Box>
                         <CardContent sx={{ p: 2 }}>
                           <Typography variant="subtitle2" fontWeight={700}>{course.title}</Typography>

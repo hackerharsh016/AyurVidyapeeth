@@ -91,7 +91,7 @@ export default function CourseCard({ course, index = 0 }: Props) {
           {course.certificate && (
             <Box sx={{ position: 'absolute', bottom: 8, right: 8 }}>
               <Chip
-                label="Certificate"
+                label="Certificate of Completion"
                 size="small"
                 sx={{ bgcolor: '#D4A017', color: 'white', fontWeight: 600, fontSize: '0.6rem', height: 18 }}
               />
@@ -168,20 +168,24 @@ export default function CourseCard({ course, index = 0 }: Props) {
                 <Typography variant="subtitle1" fontWeight={700} color="primary.main">
                   ₹{course.price.toLocaleString()}
                 </Typography>
-                <Typography
-                  variant="caption"
-                  sx={{
-                    color: 'text.disabled',
-                    textDecoration: 'line-through',
-                  }}
-                >
-                  ₹{course.originalPrice.toLocaleString()}
-                </Typography>
-                <Chip
-                  label={`${Math.round((1 - course.price / course.originalPrice) * 100)}% off`}
-                  size="small"
-                  sx={{ bgcolor: '#FEF3C7', color: '#92400E', fontSize: '0.6rem', height: 18, fontWeight: 600 }}
-                />
+                {course.originalPrice > course.price && (
+                  <>
+                    <Typography
+                      variant="caption"
+                      sx={{
+                        color: 'text.disabled',
+                        textDecoration: 'line-through',
+                      }}
+                    >
+                      ₹{course.originalPrice.toLocaleString()}
+                    </Typography>
+                    <Chip
+                      label={`${Math.round((1 - course.price / course.originalPrice) * 100)}% off`}
+                      size="small"
+                      sx={{ bgcolor: '#FEF3C7', color: '#92400E', fontSize: '0.6rem', height: 18, fontWeight: 600 }}
+                    />
+                  </>
+                )}
               </>
             )}
           </Box>

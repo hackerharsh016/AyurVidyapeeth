@@ -35,6 +35,23 @@ import TrendingUpIcon from '@mui/icons-material/TrendingUp';
 import PeopleIcon from '@mui/icons-material/People';
 import StarIcon from '@mui/icons-material/Star';
 import VisibilityIcon from '@mui/icons-material/Visibility';
+import EditIcon from '@mui/icons-material/Edit';
+import DeleteIcon from '@mui/icons-material/Delete';
+import CloseIcon from '@mui/icons-material/Close';
+import Dialog from '@mui/material/Dialog';
+import DialogTitle from '@mui/material/DialogTitle';
+import DialogContent from '@mui/material/DialogContent';
+import DialogActions from '@mui/material/DialogActions';
+import TextField from '@mui/material/TextField';
+import InputAdornment from '@mui/material/InputAdornment';
+import Alert from '@mui/material/Alert';
+import Snackbar from '@mui/material/Snackbar';
+import FormControl from '@mui/material/FormControl';
+import InputLabel from '@mui/material/InputLabel';
+import Select from '@mui/material/Select';
+import type { SelectChangeEvent } from '@mui/material';
+import MenuItem from '@mui/material/MenuItem';
+import type { Course } from '../../data/courses';
 
 import PageLayout from '../../components/PageLayout';
 import { useAuthStore } from '../../stores/authStore';
@@ -65,6 +82,12 @@ export default function CreatorDashboard() {
     totalViews: 0,
   });
   const [reviews, setReviews] = useState<any[]>([]);
+  
+  // Edit Course State
+  const [editingCourse, setEditingCourse] = useState<Course | null>(null);
+  const [editForm, setEditForm] = useState<Partial<Course>>({});
+  const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [toast, setToast] = useState({ open: false, message: '', severity: 'success' as 'success' | 'error' });
 
   useEffect(() => {
     if (isAuthenticated && user) {
@@ -140,6 +163,39 @@ export default function CreatorDashboard() {
 
   const myCourses = courses.filter(c => c.creatorId === user?.id || (user?.role === 'admin' && c.creatorId === user?.id));
 
+  const { updateCourse, deleteCourse } = useCourseStore();
+
+  const handleEditClick = (course: Course) => {
+    setEditingCourse(course);
+    setEditForm({
+      title: course.title,
+      subtitle: course.subtitle,
+      description: course.description,
+      price: course.price,
+      originalPrice: course.originalPrice,
+      validityMonths: course.validityMonths,
+    });
+  };
+
+  const handleUpdateCourse = async () => {
+    if (!editingCourse) return;
+    await updateCourse(editingCourse.id, editForm);
+    setEditingCourse(null);
+    setToast({ open: true, message: 'Course updated successfully!', severity: 'success' });
+  };
+
+  const handleDeleteCourse = async () => {
+    if (!deleteId) return;
+    try {
+      await deleteCourse(deleteId);
+      setDeleteId(null);
+      setToast({ open: true, message: 'Course deleted successfully!', severity: 'success' });
+    } catch (err: any) {
+      setToast({ open: true, message: err.message || 'Error deleting course', severity: 'error' });
+      setDeleteId(null);
+    }
+  };
+
   const filteredCourses = activeFilter === 'all' 
     ? myCourses 
     : myCourses.filter(c => c.status === activeFilter);
@@ -162,7 +218,12 @@ export default function CreatorDashboard() {
   const sidebarContent = (
     <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
       <Box sx={{ p: 3, display: 'flex', alignItems: 'center', gap: 2 }}>
-        <Avatar sx={{ bgcolor: 'primary.main', width: 40, height: 40 }}>{user?.name?.[0]}</Avatar>
+        <Avatar 
+          src={(user?.avatar?.startsWith('http') || user?.avatar?.startsWith('/')) ? user.avatar : undefined} 
+          sx={{ bgcolor: 'primary.main', width: 40, height: 40 }}
+        >
+          {user?.name?.[0]}
+        </Avatar>
         <Box>
           <Typography variant="subtitle2" fontWeight={700} noWrap>{user?.name}</Typography>
           <Typography variant="caption" color="text.secondary" noWrap>Creator</Typography>
@@ -347,9 +408,11 @@ export default function CreatorDashboard() {
                         <Box sx={{ textAlign: 'right' }}>
                           <Chip label={course.status} size="small" sx={{ mb: 1.5, fontWeight: 700 }} color={course.status === 'published' ? 'success' : 'default'} />
                           <Box sx={{ display: 'flex', gap: 1 }}>
-                            <Button size="small" variant="outlined" onClick={() => navigate(`/creator/manage/${course.id}`)}>Manage</Button>
-                            <Button size="small" onClick={() => navigate(`/courses/${course.id}`)}>View</Button>
-                          </Box>
+                             <Button size="small" variant="outlined" onClick={() => navigate(`/creator/manage/${course.id}`)}>Curriculum</Button>
+                             <IconButton size="small" color="primary" onClick={() => handleEditClick(course)}><EditIcon fontSize="small" /></IconButton>
+                             <IconButton size="small" color="error" onClick={() => setDeleteId(course.id)}><DeleteIcon fontSize="small" /></IconButton>
+                             <Button size="small" onClick={() => navigate(`/courses/${course.id}`)}>View</Button>
+                           </Box>
                         </Box>
                       </CardContent>
                     </Card>
@@ -499,6 +562,106 @@ export default function CreatorDashboard() {
           </AnimatePresence>
         </Box>
       </Box>
+
+      {/* Edit Course Dialog */}
+      <Dialog open={!!editingCourse} onClose={() => setEditingCourse(null)} maxWidth="sm" fullWidth PaperProps={{ sx: { borderRadius: 4 } }}>
+        <DialogTitle sx={{ fontWeight: 800, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          Edit Course Details
+          <IconButton onClick={() => setEditingCourse(null)}><CloseIcon /></IconButton>
+        </DialogTitle>
+        <DialogContent dividers>
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3, pt: 1 }}>
+            <TextField 
+              label="Course Title" 
+              fullWidth 
+              value={editForm.title || ''} 
+              onChange={e => setEditForm({ ...editForm, title: e.target.value })} 
+            />
+            <TextField 
+              label="Subtitle" 
+              fullWidth 
+              value={editForm.subtitle || ''} 
+              onChange={e => setEditForm({ ...editForm, subtitle: e.target.value })} 
+            />
+            <TextField 
+              label="Description" 
+              fullWidth 
+              multiline 
+              rows={4} 
+              value={editForm.description || ''} 
+              onChange={e => setEditForm({ ...editForm, description: e.target.value })} 
+            />
+            
+            <Box sx={{ display: 'flex', gap: 2 }}>
+              <TextField 
+                label="Regular Price (Original)" 
+                fullWidth 
+                type="number"
+                value={editForm.originalPrice || 0} 
+                onChange={e => setEditForm({ ...editForm, originalPrice: Number(e.target.value) })}
+                InputProps={{ startAdornment: <InputAdornment position="start">₹</InputAdornment> }}
+              />
+              <TextField 
+                label="Selling Price (New)" 
+                fullWidth 
+                type="number"
+                value={editForm.price || 0} 
+                onChange={e => setEditForm({ ...editForm, price: Number(e.target.value) })}
+                InputProps={{ startAdornment: <InputAdornment position="start">₹</InputAdornment> }}
+              />
+            </Box>
+
+             <FormControl fullWidth>
+               <InputLabel>Course Validity (Months)</InputLabel>
+               <Select 
+                 value={editForm.validityMonths || 12} 
+                 onChange={(e: SelectChangeEvent<number>) => setEditForm({ ...editForm, validityMonths: Number(e.target.value) })} 
+                 label="Course Validity (Months)"
+               >
+                 {[6, 12, 24].map(v => <MenuItem key={v} value={v}>{v} Months</MenuItem>)}
+               </Select>
+             </FormControl>
+
+            {(editForm.originalPrice! > editForm.price! || editForm.validityMonths) && (
+              <Alert severity="info" sx={{ borderRadius: 2 }}>
+                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+                  {editForm.originalPrice! > editForm.price! && (
+                    <Typography variant="body2">Dynamic Discount: <strong>{Math.round((1 - editForm.price! / editForm.originalPrice!) * 100)}% OFF</strong></Typography>
+                  )}
+                  <Typography variant="body2">Validity Period: <strong>{editForm.validityMonths || 12} Months</strong></Typography>
+                </Box>
+              </Alert>
+            )}
+          </Box>
+        </DialogContent>
+        <DialogActions sx={{ p: 3 }}>
+          <Button onClick={() => setEditingCourse(null)} color="inherit">Cancel</Button>
+          <Button onClick={handleUpdateCourse} variant="contained" sx={{ px: 4, borderRadius: 2 }}>Update Course</Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Delete Confirmation */}
+      <Dialog open={!!deleteId} onClose={() => setDeleteId(null)}>
+        <DialogTitle fontWeight={800}>Delete Course?</DialogTitle>
+        <DialogContent>
+          <Typography variant="body2" color="text.secondary">
+            Are you sure you want to delete this course? This action cannot be undone and all course content, enrollments, and reviews will be removed.
+          </Typography>
+        </DialogContent>
+        <DialogActions sx={{ p: 2 }}>
+          <Button onClick={() => setDeleteId(null)}>Cancel</Button>
+          <Button onClick={handleDeleteCourse} color="error" variant="contained">Delete Forever</Button>
+        </DialogActions>
+      </Dialog>
+
+      <Snackbar 
+        open={toast.open} 
+        autoHideDuration={4000} 
+        onClose={() => setToast({ ...toast, open: false })}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+      >
+        <Alert severity={toast.severity} sx={{ borderRadius: 2 }}>{toast.message}</Alert>
+      </Snackbar>
     </PageLayout>
   );
 }

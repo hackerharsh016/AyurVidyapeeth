@@ -47,7 +47,11 @@ export default function VideoPlayerPage() {
   const [playing, setPlaying] = useState(false);
   const [fakeProgress, setFakeProgress] = useState(0);
   const [tab, setTab] = useState(0);
-  const [toast, setToast] = useState({ open: false, message: '' });
+  const [toast, setToast] = useState<{
+    open: boolean;
+    message: string;
+    severity: 'success' | 'error' | 'info' | 'warning';
+  }>({ open: false, message: '', severity: 'info' });
   const [speed, setSpeed] = useState(1);
   const [notes, setNotes] = useState('');
   const [showCongrats, setShowCongrats] = useState(false);
@@ -173,7 +177,7 @@ export default function VideoPlayerPage() {
     if (!activeLesson) return;
     const currentTime = videoRef.current?.currentTime || 0;
     updateProgress(courseId || '', activeLesson.id, currentTime, true);
-    setToast({ open: true, message: `✅ "${activeLesson.title}" marked as complete!` });
+    setToast({ open: true, message: `✅ "${activeLesson.title}" marked as complete!`, severity: 'success' });
     if (progress >= 90) setShowCongrats(true);
     if (nextLesson) {
       const section = course.curriculum.find(s => s.lessons.some(l => l.id === nextLesson.id));
@@ -220,6 +224,7 @@ export default function VideoPlayerPage() {
             >
               {activeLesson?.videoUrl ? (
                 <video
+                  key={activeLesson.id}
                   ref={videoRef}
                   src={activeLesson.videoUrl}
                   style={{ width: '100%', height: '100%', objectFit: 'contain' }}
@@ -230,14 +235,26 @@ export default function VideoPlayerPage() {
                   onLoadedMetadata={() => {
                     if (videoRef.current && activeLesson) {
                       const savedSeconds = getWatchedSeconds(courseId || '', activeLesson.id);
-                      if (savedSeconds > 0) {
+                      if (savedSeconds > 0 && savedSeconds < videoRef.current.duration) {
                         videoRef.current.currentTime = savedSeconds;
                       }
                     }
                   }}
+                  onError={(e) => {
+                    const videoTag = e.currentTarget;
+                    console.error("Video error:", videoTag.error);
+                    let msg = "Error loading video.";
+                    if (videoTag.error?.code === 4) msg = "Video format not supported or file unreachable.";
+                    setToast({ open: true, message: msg, severity: 'error' });
+                  }}
                   controls
                   controlsList="nodownload"
-                />
+                  playsInline
+                  preload="metadata"
+                  autoPlay={false}
+                >
+                  Your browser does not support the video tag.
+                </video>
               ) : (
                 <Box sx={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 2, zIndex: 1, background: 'linear-gradient(135deg, #0E5B44 0%, #093D2E 100%)' }}>
                   <Typography sx={{ fontSize: '3rem' }}>🌿</Typography>
@@ -493,7 +510,7 @@ export default function VideoPlayerPage() {
         onClose={() => setToast(t => ({ ...t, open: false }))}
         anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
       >
-        <Alert severity="success" sx={{ borderRadius: 2 }}>{toast.message}</Alert>
+        <Alert severity={toast.severity} sx={{ borderRadius: 2 }}>{toast.message}</Alert>
       </Snackbar>
     </PageLayout>
   );
