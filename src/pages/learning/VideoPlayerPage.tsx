@@ -39,7 +39,7 @@ export default function VideoPlayerPage() {
   const { courseId } = useParams<{ courseId: string }>();
   const navigate = useNavigate();
   const { getCourseById, isEnrolled } = useCourseStore();
-  const { markComplete, isCompleted, getCourseProgress, setCurrentLesson, getCurrentLesson } = useProgressStore();
+  const { updateProgress, isCompleted, getWatchedSeconds, getCourseProgress, setCurrentLesson, getCurrentLesson, fetchProgress } = useProgressStore();
 
   const [activeLesson, setActiveLesson] = useState<Lesson | null>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -54,6 +54,10 @@ export default function VideoPlayerPage() {
 
   const course = getCourseById(courseId || '');
   const enrolled = isEnrolled(courseId || '');
+
+  useEffect(() => {
+    fetchProgress();
+  }, [fetchProgress]);
 
   useEffect(() => {
     if (course) {
@@ -77,6 +81,19 @@ export default function VideoPlayerPage() {
       setActiveSectionId(sectionId);
     }
   }, [course, courseId, getCurrentLesson]);
+
+  // Periodic Progress Update
+  useEffect(() => {
+    let interval: any;
+    if (playing && activeLesson) {
+      interval = setInterval(() => {
+        if (videoRef.current) {
+          updateProgress(courseId || '', activeLesson.id, videoRef.current.currentTime);
+        }
+      }, 5000); // Sync every 5 seconds
+    }
+    return () => clearInterval(interval);
+  }, [playing, activeLesson, courseId, updateProgress]);
 
   useEffect(() => {
     if (videoRef.current) {
@@ -154,7 +171,8 @@ export default function VideoPlayerPage() {
 
   const handleMarkComplete = () => {
     if (!activeLesson) return;
-    markComplete(courseId || '', activeLesson.id);
+    const currentTime = videoRef.current?.currentTime || 0;
+    updateProgress(courseId || '', activeLesson.id, currentTime, true);
     setToast({ open: true, message: `✅ "${activeLesson.title}" marked as complete!` });
     if (progress >= 90) setShowCongrats(true);
     if (nextLesson) {
@@ -209,6 +227,14 @@ export default function VideoPlayerPage() {
                   onEnded={handleEnded}
                   onPlay={() => setPlaying(true)}
                   onPause={() => setPlaying(false)}
+                  onLoadedMetadata={() => {
+                    if (videoRef.current && activeLesson) {
+                      const savedSeconds = getWatchedSeconds(courseId || '', activeLesson.id);
+                      if (savedSeconds > 0) {
+                        videoRef.current.currentTime = savedSeconds;
+                      }
+                    }
+                  }}
                   controls
                   controlsList="nodownload"
                 />
@@ -283,7 +309,6 @@ export default function VideoPlayerPage() {
                 }}
               >
                 <Tab label="Notes" />
-                <Tab label="Resources" />
                 <Tab label="About" />
               </Tabs>
 
@@ -315,32 +340,6 @@ export default function VideoPlayerPage() {
                   </Box>
                 )}
                 {tab === 1 && (
-                  <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-                    <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.5)', mb: 1, display: 'block' }}>
-                      Downloadable resources
-                    </Typography>
-                    {['Lecture Notes PDF', 'Sanskrit Glossary', 'Quick Reference Chart'].map((res, i) => (
-                      <Box
-                        key={i}
-                        sx={{
-                          p: 1.5,
-                          bgcolor: 'rgba(255,255,255,0.05)',
-                          borderRadius: 2,
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: 2,
-                          cursor: 'pointer',
-                          '&:hover': { bgcolor: 'rgba(255,255,255,0.08)' },
-                        }}
-                      >
-                        <Typography>📄</Typography>
-                        <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.8)' }}>{res}</Typography>
-                        <Chip label="PDF" size="small" sx={{ ml: 'auto', bgcolor: 'rgba(220,38,38,0.2)', color: '#FCA5A5', fontSize: '0.6rem', height: 18 }} />
-                      </Box>
-                    ))}
-                  </Box>
-                )}
-                {tab === 2 && (
                   <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.6)', lineHeight: 1.7 }}>
                     {course.description.slice(0, 300)}...
                   </Typography>

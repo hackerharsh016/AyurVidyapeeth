@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Box from '@mui/material/Box';
 import Container from '@mui/material/Container';
@@ -23,10 +23,14 @@ import { useAuthStore } from '../../stores/authStore';
 export default function LearningPage() {
   const navigate = useNavigate();
   const { enrolledCourses, courses, wishlist } = useCourseStore();
-  const { getCourseProgress } = useProgressStore();
+  const { getCourseProgress, fetchProgress } = useProgressStore();
   const { isAuthenticated, user } = useAuthStore();
   const [tab, setTab] = useState(0);
   const [downloadingCert, setDownloadingCert] = useState<string | null>(null);
+
+  useEffect(() => {
+    fetchProgress();
+  }, [fetchProgress]);
 
   const enrolledCourseData = enrolledCourses
     .map(e => ({ ...e, course: courses.find(c => c.id === e.courseId) }))
