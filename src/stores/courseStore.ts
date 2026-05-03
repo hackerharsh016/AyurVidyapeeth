@@ -111,9 +111,9 @@ export const useCourseStore = create<CourseState>()((set, get) => ({
           totalLessons: totalLessonsCount,
           totalPdfs: allLessons.filter((l: any) => l.type === 'pdf').length,
           duration: durationStr,
-          certificate: c.level === 'Advanced' || false,
+          certificate: c.has_certificate || false,
           language: c.language ?? 'English',
-          level: c.level ?? 'Beginner',
+          level: c.level ?? '1st Professional',
           subject: c.subject ?? c.category ?? 'Ayurveda',
           free: Number(c.price) === 0,
           creatorId: c.creator_id,
@@ -231,6 +231,7 @@ export const useCourseStore = create<CourseState>()((set, get) => ({
       language: course.language,
       what_you_learn: course.whatYouLearn,
       total_lessons: course.totalLessons,
+      has_certificate: course.certificate,
       status: 'pending' // new courses go to pending
     }).select('id').single();
     

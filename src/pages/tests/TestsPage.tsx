@@ -21,6 +21,11 @@ import { motion } from 'framer-motion';
 import PageLayout from '../../components/PageLayout';
 import { supabase } from '../../supabase/supabase';
 import { useAuthStore } from '../../stores/authStore';
+import { SUBJECTS } from '../../constants/subjects';
+import FormControl from '@mui/material/FormControl';
+import InputLabel from '@mui/material/InputLabel';
+import Select from '@mui/material/Select';
+import MenuItem from '@mui/material/MenuItem';
 
 interface Test {
   id: string;
@@ -41,6 +46,7 @@ export default function TestsPage() {
   const [tests, setTests] = useState<Test[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
+  const [subject, setSubject] = useState('All');
 
   useEffect(() => {
     const fetchTests = async () => {
@@ -58,11 +64,13 @@ export default function TestsPage() {
     fetchTests();
   }, []);
 
-  const filtered = tests.filter(t =>
-    !search ||
-    t.title.toLowerCase().includes(search.toLowerCase()) ||
-    (t.subject || '').toLowerCase().includes(search.toLowerCase())
-  );
+  const filtered = tests.filter(t => {
+    const matchesSearch = !search || 
+      t.title.toLowerCase().includes(search.toLowerCase()) ||
+      (t.subject || '').toLowerCase().includes(search.toLowerCase());
+    const matchesSubject = subject === 'All' || t.subject === subject;
+    return matchesSearch && matchesSubject;
+  });
 
   return (
     <PageLayout>
@@ -79,13 +87,35 @@ export default function TestsPage() {
                 Test your Ayurveda knowledge with curated MCQ tests. Get an instant scorecard.
               </Typography>
             </Box>
-            <Box sx={{ maxWidth: 520, mx: 'auto' }}>
-              <TextField fullWidth placeholder="Search tests by title or subject..."
+            <Box sx={{ maxWidth: 800, mx: 'auto', display: 'flex', gap: 2, flexWrap: 'wrap', justifyContent: 'center' }}>
+              <TextField 
+                placeholder="Search tests by title or subject..."
                 value={search} onChange={e => setSearch(e.target.value)}
+                sx={{ flex: 1, minWidth: 300 }}
                 InputProps={{
                   startAdornment: <InputAdornment position="start"><SearchIcon sx={{ color: 'rgba(255,255,255,0.5)' }} /></InputAdornment>,
                   sx: { bgcolor: 'rgba(255,255,255,0.08)', borderRadius: 3, color: 'white', '& fieldset': { borderColor: 'rgba(255,255,255,0.15)' }, '& input': { color: 'white' }, '& input::placeholder': { color: 'rgba(255,255,255,0.4)', opacity: 1 } },
                 }} />
+              
+              <FormControl sx={{ minWidth: 180 }}>
+                <Select
+                  value={subject}
+                  onChange={e => setSubject(e.target.value)}
+                  sx={{ 
+                    bgcolor: 'rgba(255,255,255,0.08)', 
+                    borderRadius: 3, 
+                    color: 'white',
+                    height: '56px',
+                    '& .MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(255,255,255,0.15)' },
+                    '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(255,255,255,0.3)' },
+                    '&.Mui-focused .MuiOutlinedInput-notchedOutline': { borderColor: 'primary.main' },
+                    '& .MuiSelect-icon': { color: 'rgba(255,255,255,0.7)' }
+                  }}
+                >
+                  <MenuItem value="All">All Subjects</MenuItem>
+                  {SUBJECTS.map(s => <MenuItem key={s} value={s}>{s}</MenuItem>)}
+                </Select>
+              </FormControl>
             </Box>
           </motion.div>
         </Container>

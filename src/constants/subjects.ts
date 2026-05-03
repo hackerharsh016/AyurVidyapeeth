@@ -1,0 +1,22 @@
+export const SUBJECTS = [
+  'Samhita Adhyayan',
+  'Kriya Sharir',
+  'Rachna Sharir',
+  'Sanskrit',
+  'Padarth vigyan',
+  'Samhita Adhyayan-2',
+  'Rasashastra evam Bhaishajyakalpana',
+  'Dravyaguna Vigyan',
+  'Roga Nidan evam Vikriti Vigyan',
+  'Agad Tantra evam Vidhi Vaidyaka',
+  'Swasthavritta evam Yoga',
+  'Kayachikitsa',
+  'Panchakarma & Upakarma',
+  'Shalya Tantra',
+  'Shalakya Tantra',
+  'Prasuti Tantra evam Stree Roga',
+  'Kaumarabhritya',
+  'Samhita Adhyayan-3',
+  'Research Methodology and Medical-statistics',
+  'Atyaikachikitsa'
+];

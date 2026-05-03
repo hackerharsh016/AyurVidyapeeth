@@ -9,9 +9,33 @@ import CardContent from '@mui/material/CardContent';
 import Button from '@mui/material/Button';
 import Chip from '@mui/material/Chip';
 import Avatar from '@mui/material/Avatar';
-import LinearProgress from '@mui/material/LinearProgress';
-import CircularProgress from '@mui/material/CircularProgress';
-import { motion } from 'framer-motion';
+import List from '@mui/material/List';
+import ListItem from '@mui/material/ListItem';
+import ListItemButton from '@mui/material/ListItemButton';
+import ListItemIcon from '@mui/material/ListItemIcon';
+import ListItemText from '@mui/material/ListItemText';
+import Divider from '@mui/material/Divider';
+import Paper from '@mui/material/Paper';
+import IconButton from '@mui/material/IconButton';
+import Drawer from '@mui/material/Drawer';
+import useMediaQuery from '@mui/material/useMediaQuery';
+import { useTheme } from '@mui/material/styles';
+import { motion, AnimatePresence } from 'framer-motion';
+
+// Icons
+import DashboardIcon from '@mui/icons-material/Dashboard';
+import BarChartIcon from '@mui/icons-material/BarChart';
+import SchoolIcon from '@mui/icons-material/School';
+import QuizIcon from '@mui/icons-material/Quiz';
+import RateReviewIcon from '@mui/icons-material/RateReview';
+import SettingsIcon from '@mui/icons-material/Settings';
+import MenuIcon from '@mui/icons-material/Menu';
+import AddIcon from '@mui/icons-material/Add';
+import TrendingUpIcon from '@mui/icons-material/TrendingUp';
+import PeopleIcon from '@mui/icons-material/People';
+import StarIcon from '@mui/icons-material/Star';
+import VisibilityIcon from '@mui/icons-material/Visibility';
+
 import PageLayout from '../../components/PageLayout';
 import { useAuthStore } from '../../stores/authStore';
 import { useCourseStore } from '../../stores/courseStore';
@@ -26,8 +50,13 @@ interface CreatorStats {
 
 export default function CreatorDashboard() {
   const navigate = useNavigate();
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('md'));
   const { user, isAuthenticated } = useAuthStore();
   const { courses, fetchCourses } = useCourseStore();
+  
+  const [activeTab, setActiveTab] = useState<'home' | 'analytics' | 'courses' | 'test' | 'reviews' | 'settings'>('home');
+  const [mobileOpen, setMobileOpen] = useState(false);
   const [activeFilter, setActiveFilter] = useState<'all' | 'published' | 'pending' | 'draft'>('all');
   const [stats, setStats] = useState<CreatorStats>({
     totalRevenue: 0,
@@ -35,23 +64,22 @@ export default function CreatorDashboard() {
     avgRating: 0,
     totalViews: 0,
   });
-  const [loading, setLoading] = useState(true);
+  const [reviews, setReviews] = useState<any[]>([]);
 
   useEffect(() => {
     if (isAuthenticated && user) {
       const fetchCreatorData = async () => {
-        setLoading(true);
         try {
           // 1. Get Creator's Courses
           const { data: myCoursesData } = await supabase
             .from('courses')
-            .select('id, rating, price, students_count')
+            .select('id, title, rating, price, students_count')
             .eq('creator_id', user.id);
 
           const myCourseIds = myCoursesData?.map(c => c.id) || [];
 
           if (myCourseIds.length > 0) {
-            // 2. Fetch Enrollments for revenue and unique students
+            // 2. Fetch Enrollments
             const { data: enrollments } = await supabase
               .from('enrollments')
               .select('user_id, courses(price)')
@@ -60,17 +88,19 @@ export default function CreatorDashboard() {
             const totalRevenue = enrollments?.reduce((acc, curr: any) => acc + (Number(curr.courses?.price) || 0), 0) || 0;
             const uniqueStudents = new Set(enrollments?.map(e => e.user_id)).size;
 
-            // 3. Calculate Average Rating from individual reviews
+            // 3. Average Rating and Reviews List
             const { data: reviewsData } = await supabase
               .from('reviews')
-              .select('rating')
-              .in('course_id', myCourseIds);
+              .select('*, courses(title), profiles(name, avatar)')
+              .in('course_id', myCourseIds)
+              .order('created_at', { ascending: false });
 
+            setReviews(reviewsData || []);
             const totalReviews = reviewsData?.length || 0;
             const sumRatings = reviewsData?.reduce((acc, curr) => acc + (curr.rating || 0), 0) || 0;
             const avgRating = totalReviews > 0 ? sumRatings / totalReviews : 0;
 
-            // 4. Fetch Views (Lesson Progress entries as proxy)
+            // 4. Views (Lesson Progress proxy)
             const { count: progressCount } = await supabase
               .from('progress')
               .select('*', { count: 'exact', head: true })
@@ -89,13 +119,11 @@ export default function CreatorDashboard() {
           }
         } catch (error) {
           console.error('Error fetching creator stats:', error);
-        } finally {
-          setLoading(false);
         }
       };
 
       fetchCreatorData();
-      fetchCourses(); // Ensure store is updated
+      fetchCourses();
     }
   }, [isAuthenticated, user, fetchCourses]);
 
@@ -111,19 +139,10 @@ export default function CreatorDashboard() {
   }
 
   const myCourses = courses.filter(c => c.creatorId === user?.id || (user?.role === 'admin' && c.creatorId === user?.id));
-  const publishedCount = myCourses.filter(c => c.status === 'published').length;
-  const pendingCount = myCourses.filter(c => c.status === 'pending').length;
-  const draftCount = myCourses.filter(c => c.status === 'draft').length;
 
   const filteredCourses = activeFilter === 'all' 
     ? myCourses 
     : myCourses.filter(c => c.status === activeFilter);
-
-  const statusColor = (s: string) => {
-    if (s === 'published') return { bg: '#D1FAE5', color: '#065F46', label: '✓ Published' };
-    if (s === 'pending') return { bg: '#FEF3C7', color: '#92400E', label: '⏳ Pending Review' };
-    return { bg: 'grey.100', color: 'text.secondary', label: '📝 Draft' };
-  };
 
   const formatCurrency = (amount: number) => {
     if (amount >= 100000) return `₹${(amount / 100000).toFixed(1)}L`;
@@ -131,199 +150,355 @@ export default function CreatorDashboard() {
     return `₹${amount}`;
   };
 
-  return (
-    <PageLayout>
-      <Box sx={{ background: 'linear-gradient(135deg, #0E5B44 0%, #1A6B52 100%)', py: { xs: 4, md: 6 } }}>
-        <Container maxWidth="lg">
-          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 2 }}>
-              <Box>
-                <Typography variant="h3" sx={{ color: 'white', fontWeight: 700, mb: 0.5, fontSize: { xs: '1.8rem', md: '2.4rem' } }}>
-                  Creator Dashboard
-                </Typography>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-                  <Avatar sx={{ bgcolor: '#D4A017', width: 28, height: 28, fontSize: '0.7rem', fontWeight: 700 }}>
-                    {user?.avatar || (user?.name ? user.name[0] : 'U')}
-                  </Avatar>
-                  <Typography variant="body1" sx={{ color: 'rgba(255,255,255,0.8)' }}>
-                    {user?.name} • {user?.college}
-                  </Typography>
-                </Box>
-              </Box>
-              <Button
-                variant="contained"
-                onClick={() => navigate('/creator/upload')}
-                sx={{ bgcolor: '#D4A017', '&:hover': { bgcolor: '#A07810' }, px: 3 }}
-              >
-                + Create New Course
-              </Button>
-            </Box>
+  const menuItems = [
+    { id: 'home', label: 'Home', icon: <DashboardIcon /> },
+    { id: 'analytics', label: 'Analytics', icon: <BarChartIcon /> },
+    { id: 'courses', label: 'Courses', icon: <SchoolIcon /> },
+    { id: 'test', label: 'Tests', icon: <QuizIcon /> },
+    { id: 'reviews', label: 'Reviews', icon: <RateReviewIcon /> },
+    { id: 'settings', label: 'Settings', icon: <SettingsIcon /> },
+  ];
 
-            {/* Stats Row */}
-            <Grid container spacing={2} sx={{ mt: 3 }}>
-              {[
-                { label: 'Total Revenue', value: formatCurrency(stats.totalRevenue), icon: '💰', change: 'Live' },
-                { label: 'Total Students', value: stats.totalStudents.toLocaleString(), icon: '👥', change: 'Live' },
-                { label: 'Avg Rating', value: stats.avgRating === 0 ? 'N/A' : stats.avgRating.toString(), icon: '⭐', change: 'Live' },
-                { label: 'Total Views', value: stats.totalViews > 1000 ? `${(stats.totalViews / 1000).toFixed(1)}k` : stats.totalViews.toString(), icon: '👁', change: 'Live' },
-              ].map((stat, i) => (
-                <Grid key={i} size={{ xs: 6, md: 3 }}>
-                  <Box sx={{ p: 2, bgcolor: 'rgba(255,255,255,0.12)', backdropFilter: 'blur(10px)', borderRadius: 3, border: '1px solid rgba(255,255,255,0.15)' }}>
-                    {loading ? (
-                      <CircularProgress size={20} sx={{ color: 'white', mb: 1 }} />
-                    ) : (
-                      <>
-                        <Typography sx={{ fontSize: '1.5rem', mb: 0.5 }}>{stat.icon}</Typography>
-                        <Typography variant="h5" sx={{ color: 'white', fontWeight: 700, fontSize: { xs: '1.2rem', md: '1.5rem' } }}>
-                          {stat.value}
-                        </Typography>
-                        <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.6)', display: 'block' }}>{stat.label}</Typography>
-                        <Typography variant="caption" sx={{ color: '#86EFAC', fontWeight: 600 }}>{stat.change}</Typography>
-                      </>
-                    )}
-                  </Box>
-                </Grid>
-              ))}
-            </Grid>
-          </motion.div>
-        </Container>
+  const sidebarContent = (
+    <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+      <Box sx={{ p: 3, display: 'flex', alignItems: 'center', gap: 2 }}>
+        <Avatar sx={{ bgcolor: 'primary.main', width: 40, height: 40 }}>{user?.name?.[0]}</Avatar>
+        <Box>
+          <Typography variant="subtitle2" fontWeight={700} noWrap>{user?.name}</Typography>
+          <Typography variant="caption" color="text.secondary" noWrap>Creator</Typography>
+        </Box>
       </Box>
-
-      <Container maxWidth="lg" sx={{ py: { xs: 4, md: 6 } }}>
-        {/* Course Status Summary */}
-        <Box sx={{ display: 'flex', gap: 2, mb: 4, flexWrap: 'wrap' }}>
-          {[
-            { id: 'all', label: 'All Courses', value: myCourses.length },
-            { id: 'published', label: 'Published', value: publishedCount },
-            { id: 'pending', label: 'Pending', value: pendingCount },
-            { id: 'draft', label: 'Draft', value: draftCount },
-          ].map((item) => (
-            <Box 
-              key={item.id} 
-              onClick={() => setActiveFilter(item.id as any)}
+      <Divider sx={{ opacity: 0.1 }} />
+      <List sx={{ px: 2, py: 2 }}>
+        {menuItems.map((item) => (
+          <ListItem key={item.id} disablePadding sx={{ mb: 1 }}>
+            <ListItemButton 
+              selected={activeTab === item.id}
+              onClick={() => {
+                setActiveTab(item.id as any);
+                if (isMobile) setMobileOpen(false);
+              }}
               sx={{ 
-                px: 3, 
-                py: 1.5, 
-                borderRadius: 2, 
-                bgcolor: activeFilter === item.id ? 'primary.main' : 'rgba(14,91,68,0.06)', 
-                cursor: 'pointer',
-                transition: 'all 0.2s ease',
-                '&:hover': {
-                  bgcolor: activeFilter === item.id ? 'primary.main' : 'rgba(14,91,68,0.1)'
+                borderRadius: 2,
+                '&.Mui-selected': {
+                  bgcolor: 'rgba(14,91,68,0.08)',
+                  color: 'primary.main',
+                  '& .MuiListItemIcon-root': { color: 'primary.main' }
                 }
               }}
             >
-              <Typography variant="caption" sx={{ color: activeFilter === item.id ? 'rgba(255,255,255,0.8)' : 'text.secondary', display: 'block' }}>
-                {item.label}
-              </Typography>
-              <Typography variant="h6" fontWeight={700} sx={{ color: activeFilter === item.id ? 'white' : 'primary.main' }}>
-                {item.value}
-              </Typography>
-            </Box>
-          ))}
-        </Box>
+              <ListItemIcon sx={{ minWidth: 40, color: 'text.secondary' }}>{item.icon}</ListItemIcon>
+              <ListItemText primary={<Typography variant="body2" fontWeight={600}>{item.label}</Typography>} />
+            </ListItemButton>
+          </ListItem>
+        ))}
+      </List>
+      <Box sx={{ mt: 'auto', p: 3 }}>
+        <Button 
+          variant="contained" 
+          fullWidth 
+          startIcon={<AddIcon />}
+          onClick={() => navigate('/creator/upload')}
+          sx={{ borderRadius: 2, py: 1, fontWeight: 700 }}
+        >
+          New Course
+        </Button>
+      </Box>
+    </Box>
+  );
 
-        {/* Course List */}
-        <Typography variant="h6" fontWeight={700} mb={3}>
-          {activeFilter === 'all' ? 'My Courses' : `${activeFilter.charAt(0).toUpperCase() + activeFilter.slice(1)} Courses`}
-        </Typography>
+  const renderContent = () => {
+    switch (activeTab) {
+      case 'home':
+        return (
+          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
+            <Typography variant="h5" fontWeight={800} mb={3}>Dashboard Overview</Typography>
+            
+            <Grid container spacing={3} sx={{ mb: 4 }}>
+              {[
+                { label: 'Revenue', value: formatCurrency(stats.totalRevenue), icon: <TrendingUpIcon />, color: '#10B981', bg: 'rgba(16,185,129,0.1)' },
+                { label: 'Students', value: stats.totalStudents, icon: <PeopleIcon />, color: '#3B82F6', bg: 'rgba(59,130,246,0.1)' },
+                { label: 'Rating', value: stats.avgRating, icon: <StarIcon />, color: '#F59E0B', bg: 'rgba(245,158,11,0.1)' },
+                { label: 'Views', value: stats.totalViews, icon: <VisibilityIcon />, color: '#8B5CF6', bg: 'rgba(139,92,246,0.1)' },
+              ].map((stat, i) => (
+                <Grid size={{ xs: 12, sm: 6, md: 3 }} key={i}>
+                  <Paper elevation={0} sx={{ p: 3, borderRadius: 4, border: '1px solid', borderColor: 'divider', display: 'flex', alignItems: 'center', gap: 2 }}>
+                    <Box sx={{ width: 48, height: 48, borderRadius: 3, bgcolor: stat.bg, color: stat.color, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{stat.icon}</Box>
+                    <Box>
+                      <Typography variant="h6" fontWeight={800}>{stat.value}</Typography>
+                      <Typography variant="caption" color="text.secondary">{stat.label}</Typography>
+                    </Box>
+                  </Paper>
+                </Grid>
+              ))}
+            </Grid>
 
-        {filteredCourses.length === 0 ? (
-          <Box sx={{ textAlign: 'center', py: 10 }}>
-            <Typography sx={{ fontSize: '3rem', mb: 2 }}>📹</Typography>
-            <Typography variant="h6" color="text.secondary">No {activeFilter !== 'all' ? activeFilter : ''} courses found</Typography>
-            {activeFilter === 'all' && (
-              <Button variant="contained" color="primary" sx={{ mt: 3 }} onClick={() => navigate('/creator/upload')}>
-                Create Your First Course
-              </Button>
-            )}
-          </Box>
-        ) : (
-          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-            {filteredCourses.map((course, i) => {
-              const sc = statusColor(course.status);
-              return (
-                <motion.div key={course.id} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.08 }}>
-                  <Card sx={{ '&:hover': { boxShadow: '0 8px 24px rgba(0,0,0,0.1)' } }}>
-                    <CardContent sx={{ display: 'flex', gap: 3, alignItems: 'center', flexWrap: 'wrap' }}>
-                      <Box sx={{ width: 64, height: 64, borderRadius: 2, bgcolor: 'primary.main', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.8rem', flexShrink: 0 }}>
-                        🌿
-                      </Box>
-                      <Box sx={{ flex: 1, minWidth: 200 }}>
-                        <Typography variant="subtitle1" fontWeight={700} mb={0.5}>{course.title}</Typography>
-                        <Typography variant="body2" color="text.secondary" mb={1}>{course.subtitle}</Typography>
-                        <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
-                          <Typography variant="caption" color="text.secondary">📹 {course.totalLessons} lessons</Typography>
-                          <Typography variant="caption" color="text.secondary">👥 {course.students.toLocaleString()} students</Typography>
-                          <Typography variant="caption" color="text.secondary">⭐ {course.rating}</Typography>
-                          <Typography variant="caption" color="text.secondary">💰 {course.free ? 'Free' : `₹${course.price.toLocaleString()}`}</Typography>
-                        </Box>
-                        <Box sx={{ mt: 1 }}>
-                          <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
-                            <Typography variant="caption" color="text.secondary">Completion rate</Typography>
-                            <Typography variant="caption" fontWeight={600} color="primary.main">
-                              {Math.round(Math.random() * 40 + 50)}%
-                            </Typography>
-                          </Box>
-                          <LinearProgress
-                            variant="determinate"
-                            value={Math.round(Math.random() * 40 + 50)}
-                            sx={{ height: 4, borderRadius: 2 }}
-                          />
-                        </Box>
-                      </Box>
-                      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1, alignItems: 'flex-end' }}>
-                        <Chip
-                          label={sc.label}
-                          size="small"
-                          sx={{ bgcolor: sc.bg, color: sc.color, fontWeight: 600 }}
+            <Grid container spacing={3}>
+              <Grid size={{ xs: 12, md: 8 }}>
+                <Paper elevation={0} sx={{ p: 3, borderRadius: 4, border: '1px solid', borderColor: 'divider', height: '100%' }}>
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 4 }}>
+                    <Typography variant="h6" fontWeight={800}>Revenue Growth</Typography>
+                    <Chip label="Live Updates" size="small" sx={{ bgcolor: 'rgba(14,91,68,0.08)', color: 'primary.main', fontWeight: 700 }} />
+                  </Box>
+                  <Box sx={{ display: 'flex', alignItems: 'flex-end', gap: 1, height: 200, pt: 2 }}>
+                    {[35, 55, 45, 70, 85, 100].map((h, i) => (
+                      <Box key={i} sx={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 1, alignItems: 'center' }}>
+                        <motion.div
+                          initial={{ height: 0 }}
+                          animate={{ height: `${h}%` }}
+                          transition={{ duration: 1, delay: i * 0.1 }}
+                          style={{
+                            width: '100%',
+                            backgroundColor: i === 5 ? '#0E5B44' : 'rgba(14,91,68,0.1)',
+                            borderRadius: '8px 8px 0 0',
+                          }}
                         />
-                        <Box sx={{ display: 'flex', gap: 1 }}>
-                          <Button size="small" variant="outlined" onClick={() => navigate(`/courses/${course.id}`)}>
-                            View
-                          </Button>
-                          <Button size="small" variant="contained" color="primary" onClick={() => navigate(`/creator/manage/${course.id}`)}>
-                            Manage Content
-                          </Button>
+                        <Typography variant="caption" color="text.secondary">{['Nov', 'Dec', 'Jan', 'Feb', 'Mar', 'Apr'][i]}</Typography>
+                      </Box>
+                    ))}
+                  </Box>
+                </Paper>
+              </Grid>
+              <Grid size={{ xs: 12, md: 4 }}>
+                <Paper elevation={0} sx={{ p: 3, borderRadius: 4, border: '1px solid', borderColor: 'divider', height: '100%' }}>
+                  <Typography variant="h6" fontWeight={800} mb={3}>Quick Actions</Typography>
+                  <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                    <Button 
+                      fullWidth 
+                      variant="outlined" 
+                      onClick={() => setActiveTab('test')}
+                      sx={{ justifyContent: 'flex-start', py: 1.5, px: 2, borderRadius: 3, borderColor: 'divider' }}
+                      startIcon={<QuizIcon />}
+                    >
+                      Manage MCQ Tests
+                    </Button>
+                    <Button 
+                      fullWidth 
+                      variant="outlined" 
+                      onClick={() => navigate('/creator/upload')}
+                      sx={{ justifyContent: 'flex-start', py: 1.5, px: 2, borderRadius: 3, borderColor: 'divider' }}
+                      startIcon={<AddIcon />}
+                    >
+                      Launch New Course
+                    </Button>
+                    <Button 
+                      fullWidth 
+                      variant="outlined" 
+                      onClick={() => setActiveTab('settings')}
+                      sx={{ justifyContent: 'flex-start', py: 1.5, px: 2, borderRadius: 3, borderColor: 'divider' }}
+                      startIcon={<SettingsIcon />}
+                    >
+                      Update Profile
+                    </Button>
+                  </Box>
+                </Paper>
+              </Grid>
+            </Grid>
+          </motion.div>
+        );
+      case 'analytics':
+        return (
+          <Box sx={{ textAlign: 'center', py: 10 }}>
+            <BarChartIcon sx={{ fontSize: 64, color: 'text.disabled', mb: 2 }} />
+            <Typography variant="h5" fontWeight={700}>Analytics Dashboard</Typography>
+            <Typography color="text.secondary">Detailed performance metrics and user insights are coming soon.</Typography>
+          </Box>
+        );
+      case 'courses':
+        return (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 4 }}>
+              <Typography variant="h5" fontWeight={800}>My Courses</Typography>
+              <Box sx={{ display: 'flex', gap: 1 }}>
+                {['all', 'published', 'pending', 'draft'].map((f) => (
+                  <Chip 
+                    key={f}
+                    label={f.charAt(0).toUpperCase() + f.slice(1)}
+                    onClick={() => setActiveFilter(f as any)}
+                    variant={activeFilter === f ? 'filled' : 'outlined'}
+                    color={activeFilter === f ? 'primary' : 'default'}
+                    sx={{ fontWeight: 600, borderRadius: 2 }}
+                  />
+                ))}
+              </Box>
+            </Box>
+
+            {filteredCourses.length === 0 ? (
+              <Box sx={{ textAlign: 'center', py: 10, bgcolor: 'rgba(0,0,0,0.02)', borderRadius: 4 }}>
+                <SchoolIcon sx={{ fontSize: 48, color: 'text.disabled', mb: 2 }} />
+                <Typography variant="h6">No courses found</Typography>
+                <Button sx={{ mt: 2 }} onClick={() => navigate('/creator/upload')}>Create Course</Button>
+              </Box>
+            ) : (
+              <Grid container spacing={2}>
+                {filteredCourses.map((course) => (
+                  <Grid size={{ xs: 12 }} key={course.id}>
+                    <Card elevation={0} sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 4, transition: 'all 0.2s', '&:hover': { borderColor: 'primary.main', boxShadow: '0 4px 20px rgba(0,0,0,0.05)' } }}>
+                      <CardContent sx={{ display: 'flex', alignItems: 'center', gap: 3, p: 3 }}>
+                        <Box sx={{ width: 60, height: 60, borderRadius: 3, bgcolor: 'rgba(14,91,68,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.5rem' }}>🌿</Box>
+                        <Box sx={{ flex: 1 }}>
+                          <Typography variant="subtitle1" fontWeight={700}>{course.title}</Typography>
+                          <Box sx={{ display: 'flex', gap: 2, mt: 0.5 }}>
+                            <Typography variant="caption" color="text.secondary">📹 {course.totalLessons} lessons</Typography>
+                            <Typography variant="caption" color="text.secondary">👥 {course.students} students</Typography>
+                            <Typography variant="caption" color="text.secondary">⭐ {course.rating}</Typography>
+                          </Box>
+                        </Box>
+                        <Box sx={{ textAlign: 'right' }}>
+                          <Chip label={course.status} size="small" sx={{ mb: 1.5, fontWeight: 700 }} color={course.status === 'published' ? 'success' : 'default'} />
+                          <Box sx={{ display: 'flex', gap: 1 }}>
+                            <Button size="small" variant="outlined" onClick={() => navigate(`/creator/manage/${course.id}`)}>Manage</Button>
+                            <Button size="small" onClick={() => navigate(`/courses/${course.id}`)}>View</Button>
+                          </Box>
+                        </Box>
+                      </CardContent>
+                    </Card>
+                  </Grid>
+                ))}
+              </Grid>
+            )}
+          </motion.div>
+        );
+      case 'test':
+        return (
+          <Box>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 4 }}>
+              <Typography variant="h5" fontWeight={800}>Test Management</Typography>
+              <Button variant="contained" startIcon={<AddIcon />} onClick={() => navigate('/creator/tests')}>
+                Open Test Builder
+              </Button>
+            </Box>
+            <Paper elevation={0} sx={{ p: 4, textAlign: 'center', borderRadius: 4, border: '1px dashed', borderColor: 'divider', bgcolor: 'rgba(0,0,0,0.01)' }}>
+              <QuizIcon sx={{ fontSize: 48, color: 'text.disabled', mb: 2 }} />
+              <Typography variant="h6" fontWeight={700} mb={1}>Manage MCQ Practice Tests</Typography>
+              <Typography color="text.secondary" mb={3}>Click below to access the full test management suite where you can design questions, set durations, and publish tests.</Typography>
+              <Button variant="outlined" onClick={() => navigate('/creator/tests')}>Go to Test Dashboard</Button>
+            </Paper>
+          </Box>
+        );
+      case 'reviews':
+        return (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+            <Typography variant="h5" fontWeight={800} mb={4}>Student Reviews</Typography>
+            {reviews.length === 0 ? (
+              <Box sx={{ textAlign: 'center', py: 10, bgcolor: 'rgba(0,0,0,0.02)', borderRadius: 4 }}>
+                <RateReviewIcon sx={{ fontSize: 48, color: 'text.disabled', mb: 2 }} />
+                <Typography variant="h6">No reviews yet</Typography>
+                <Typography color="text.secondary">Reviews from your students will appear here.</Typography>
+              </Box>
+            ) : (
+              <Grid container spacing={2}>
+                {reviews.map((review) => (
+                  <Grid size={{ xs: 12 }} key={review.id}>
+                    <Paper elevation={0} sx={{ p: 3, borderRadius: 4, border: '1px solid', borderColor: 'divider' }}>
+                      <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 2 }}>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                          <Avatar sx={{ bgcolor: 'secondary.main', width: 40, height: 40 }}>
+                            {review.profiles?.name?.[0] || 'U'}
+                          </Avatar>
+                          <Box>
+                            <Typography variant="subtitle2" fontWeight={700}>{review.profiles?.name || 'Anonymous Student'}</Typography>
+                            <Typography variant="caption" color="text.secondary">on {review.courses?.title}</Typography>
+                          </Box>
+                        </Box>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, px: 1.5, py: 0.5, bgcolor: 'rgba(245,158,11,0.1)', color: '#F59E0B', borderRadius: 2 }}>
+                          <StarIcon sx={{ fontSize: 16 }} />
+                          <Typography variant="subtitle2" fontWeight={700}>{review.rating}</Typography>
                         </Box>
                       </Box>
-                    </CardContent>
-                  </Card>
-                </motion.div>
-              );
-            })}
+                      <Typography variant="body2" color="text.primary" sx={{ fontStyle: review.comment ? 'normal' : 'italic' }}>
+                        {review.comment || 'No comment provided.'}
+                      </Typography>
+                      <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 2 }}>
+                        {new Date(review.created_at).toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' })}
+                      </Typography>
+                    </Paper>
+                  </Grid>
+                ))}
+              </Grid>
+            )}
+          </motion.div>
+        );
+      case 'settings':
+        return (
+          <Box maxWidth="sm">
+            <Typography variant="h5" fontWeight={800} mb={4}>Creator Settings</Typography>
+            <Paper elevation={0} sx={{ p: 4, borderRadius: 4, border: '1px solid', borderColor: 'divider' }}>
+              <Box sx={{ mb: 4, textAlign: 'center' }}>
+                <Avatar sx={{ width: 80, height: 80, mx: 'auto', mb: 2, bgcolor: 'primary.main', fontSize: '2rem' }}>{user?.name?.[0]}</Avatar>
+                <Typography variant="h6" fontWeight={700}>{user?.name}</Typography>
+                <Typography variant="body2" color="text.secondary">{user?.college}</Typography>
+              </Box>
+              <Divider sx={{ mb: 4 }} />
+              <Grid container spacing={3}>
+                <Grid size={{ xs: 12 }}>
+                  <Typography variant="subtitle2" gutterBottom>Display Name</Typography>
+                  <Typography variant="body1" sx={{ p: 1.5, bgcolor: '#F9FAFB', borderRadius: 2 }}>{user?.name}</Typography>
+                </Grid>
+                <Grid size={{ xs: 12 }}>
+                  <Typography variant="subtitle2" gutterBottom>College / Institution</Typography>
+                  <Typography variant="body1" sx={{ p: 1.5, bgcolor: '#F9FAFB', borderRadius: 2 }}>{user?.college}</Typography>
+                </Grid>
+                <Grid size={{ xs: 12 }}>
+                  <Button variant="contained" disabled fullWidth sx={{ py: 1.5, borderRadius: 2 }}>Update Settings (Coming Soon)</Button>
+                </Grid>
+              </Grid>
+            </Paper>
+          </Box>
+        );
+      default:
+        return null;
+    }
+  };
+
+  return (
+    <PageLayout>
+      <Box sx={{ display: 'flex', minHeight: 'calc(100vh - 64px)', bgcolor: '#fbfbfb' }}>
+        {/* Sidebar for Desktop */}
+        {!isMobile && (
+          <Box sx={{ width: 280, flexShrink: 0, borderRight: '1px solid', borderColor: 'divider', bgcolor: 'white' }}>
+            {sidebarContent}
           </Box>
         )}
 
-        {/* Revenue Chart Placeholder */}
-        <Box sx={{ mt: 6 }}>
-          <Typography variant="h6" fontWeight={700} mb={3}>Revenue Overview</Typography>
-          <Card sx={{ p: 3 }}>
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 3 }}>
-              <Typography variant="subtitle2" color="text.secondary">Last 6 months</Typography>
-              <Chip label={`Total: ${formatCurrency(stats.totalRevenue)}`} sx={{ bgcolor: '#D1FAE5', color: '#065F46', fontWeight: 600 }} />
+        {/* Mobile Sidebar (Drawer) */}
+        <Drawer
+          variant="temporary"
+          open={mobileOpen}
+          onClose={() => setMobileOpen(false)}
+          ModalProps={{ keepMounted: true }}
+          sx={{
+            display: { xs: 'block', md: 'none' },
+            '& .MuiDrawer-paper': { boxSizing: 'border-box', width: 280 },
+          }}
+        >
+          {sidebarContent}
+        </Drawer>
+
+        {/* Main Content Area */}
+        <Box sx={{ flexGrow: 1, p: { xs: 2, md: 4, lg: 6 }, overflowX: 'hidden' }}>
+          {isMobile && (
+            <Box sx={{ mb: 3, display: 'flex', alignItems: 'center', gap: 2 }}>
+              <IconButton onClick={() => setMobileOpen(true)} color="primary">
+                <MenuIcon />
+              </IconButton>
+              <Typography variant="h6" fontWeight={800}>{menuItems.find(m => m.id === activeTab)?.label}</Typography>
             </Box>
-            <Box sx={{ display: 'flex', alignItems: 'flex-end', gap: 1, height: 120 }}>
-              {[35, 55, 45, 70, 85, 100].map((h, i) => (
-                <Box key={i} sx={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 0.5, alignItems: 'center' }}>
-                  <Box
-                    sx={{
-                      width: '100%',
-                      height: `${h}%`,
-                      bgcolor: i === 5 ? 'primary.main' : 'rgba(14,91,68,0.2)',
-                      borderRadius: '4px 4px 0 0',
-                      transition: 'height 0.5s ease',
-                    }}
-                  />
-                  <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.65rem' }}>
-                    {['Nov', 'Dec', 'Jan', 'Feb', 'Mar', 'Apr'][i]}
-                  </Typography>
-                </Box>
-              ))}
-            </Box>
-          </Card>
+          )}
+          
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={activeTab}
+              initial={{ opacity: 0, x: 10 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -10 }}
+              transition={{ duration: 0.2 }}
+            >
+              {renderContent()}
+            </motion.div>
+          </AnimatePresence>
         </Box>
-      </Container>
+      </Box>
     </PageLayout>
   );
 }

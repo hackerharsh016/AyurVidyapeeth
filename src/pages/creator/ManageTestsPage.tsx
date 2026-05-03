@@ -36,6 +36,7 @@ import { motion } from 'framer-motion';
 import PageLayout from '../../components/PageLayout';
 import { supabase } from '../../supabase/supabase';
 import { useAuthStore } from '../../stores/authStore';
+import { SUBJECTS } from '../../constants/subjects';
 
 interface Question {
   id?: string;
@@ -71,7 +72,7 @@ const emptyQ = (): Question => ({
 });
 
 const emptyTest: Test = {
-  title: '', description: '', subject: '', eligibility: '',
+  title: '', description: '', subject: SUBJECTS[0], eligibility: '',
   duration_minutes: 30, total_marks: 0, pass_marks: 0, status: 'draft',
 };
 
@@ -292,7 +293,16 @@ export default function ManageTestsPage() {
             <TextField label="Description" value={testForm.description} onChange={e => setTestForm(f => ({ ...f, description: e.target.value }))} fullWidth multiline rows={3} />
             <Grid container spacing={2}>
               <Grid size={{ xs: 12, sm: 6 }}>
-                <TextField label="Subject" value={testForm.subject} onChange={e => setTestForm(f => ({ ...f, subject: e.target.value }))} fullWidth placeholder="e.g. Kayachikitsa" />
+                <FormControl fullWidth>
+                  <InputLabel>Subject</InputLabel>
+                  <Select
+                    label="Subject"
+                    value={testForm.subject}
+                    onChange={e => setTestForm(f => ({ ...f, subject: e.target.value }))}
+                  >
+                    {SUBJECTS.map(s => <MenuItem key={s} value={s}>{s}</MenuItem>)}
+                  </Select>
+                </FormControl>
               </Grid>
               <Grid size={{ xs: 12, sm: 6 }}>
                 <TextField label="Eligibility" value={testForm.eligibility} onChange={e => setTestForm(f => ({ ...f, eligibility: e.target.value }))} fullWidth placeholder="e.g. BAMS 1st Year" />

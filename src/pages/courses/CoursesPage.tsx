@@ -17,9 +17,10 @@ import { motion, AnimatePresence } from 'framer-motion';
 import PageLayout from '../../components/PageLayout';
 import CourseCard from '../../components/CourseCard';
 import { useCourseStore } from '../../stores/courseStore';
+import { SUBJECTS } from '../../constants/subjects';
 
-const subjects = ['All', 'Dravyaguna', 'Panchakarma', 'Sharir Rachana', 'Nadi Pariksha', 'Ahara', 'Samhita'];
-const levels = ['All Levels', 'Beginner', 'Intermediate', 'Advanced'];
+const subjects = ['All', ...SUBJECTS];
+const levels = ['All Years', '1st Professional', '2nd Professional', '3rd Professional'];
 
 export default function CoursesPage() {
   const { courses } = useCourseStore();
@@ -27,7 +28,7 @@ export default function CoursesPage() {
 
   const [search, setSearch] = useState('');
   const [subject, setSubject] = useState('All');
-  const [level, setLevel] = useState('All Levels');
+  const [level, setLevel] = useState('All Years');
   const [priceFilter, setPriceFilter] = useState<'all' | 'free' | 'paid'>('all');
   const [sortBy, setSortBy] = useState('popular');
 
@@ -37,7 +38,7 @@ export default function CoursesPage() {
           !c.instructor.toLowerCase().includes(search.toLowerCase()) &&
           !c.subject.toLowerCase().includes(search.toLowerCase())) return false;
       if (subject !== 'All' && c.subject !== subject) return false;
-      if (level !== 'All Levels' && c.level !== level) return false;
+      if (level !== 'All Years' && c.level !== level) return false;
       if (priceFilter === 'free' && !c.free) return false;
       if (priceFilter === 'paid' && c.free) return false;
       return true;
@@ -127,9 +128,9 @@ export default function CoursesPage() {
               <ToggleButton value="paid">Paid</ToggleButton>
             </ToggleButtonGroup>
 
-            <FormControl size="small" sx={{ minWidth: 140 }}>
-              <InputLabel>Level</InputLabel>
-              <Select value={level} onChange={e => setLevel(e.target.value)} label="Level" sx={{ borderRadius: 2 }}>
+            <FormControl size="small" sx={{ minWidth: 160 }}>
+              <InputLabel>Professional Year</InputLabel>
+              <Select value={level} onChange={e => setLevel(e.target.value)} label="Professional Year" sx={{ borderRadius: 2 }}>
                 {levels.map(l => <MenuItem key={l} value={l}>{l}</MenuItem>)}
               </Select>
             </FormControl>

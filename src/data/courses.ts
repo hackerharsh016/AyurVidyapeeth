@@ -26,7 +26,7 @@ export interface Course {
   rating: number;
   students: number;
   duration: string;
-  level: 'Beginner' | 'Intermediate' | 'Advanced';
+  level: '1st Professional' | '2nd Professional' | '3rd Professional';
   language: string;
   subject: string;
   tags: string[];
@@ -66,7 +66,7 @@ export const courses: Course[] = [
     rating: 4.8,
     students: 3240,
     duration: '24 hrs',
-    level: 'Beginner',
+    level: '1st Professional',
     language: 'Hindi + English',
     subject: 'Dravyaguna',
     tags: ['herbs', 'pharmacology', 'basics'],
@@ -144,7 +144,7 @@ export const courses: Course[] = [
     rating: 4.9,
     students: 1876,
     duration: '36 hrs',
-    level: 'Intermediate',
+    level: '2nd Professional',
     language: 'English',
     subject: 'Panchakarma',
     tags: ['detox', 'therapy', 'panchakarma'],
@@ -210,7 +210,7 @@ export const courses: Course[] = [
     rating: 4.6,
     students: 8920,
     duration: '12 hrs',
-    level: 'Beginner',
+    level: '1st Professional',
     language: 'Hindi',
     subject: 'Sharir Rachana',
     tags: ['anatomy', 'basics', 'BAMS', 'free'],
@@ -266,7 +266,7 @@ export const courses: Course[] = [
     rating: 4.7,
     students: 2100,
     duration: '18 hrs',
-    level: 'Intermediate',
+    level: '2nd Professional',
     language: 'English + Sanskrit',
     subject: 'Nadi Pariksha',
     tags: ['pulse diagnosis', 'pariksha', 'dosha'],
@@ -312,7 +312,7 @@ export const courses: Course[] = [
     rating: 4.5,
     students: 5670,
     duration: '15 hrs',
-    level: 'Beginner',
+    level: '1st Professional',
     language: 'English',
     subject: 'Ahara',
     tags: ['nutrition', 'diet', 'lifestyle'],
@@ -358,7 +358,7 @@ export const courses: Course[] = [
     rating: 4.9,
     students: 890,
     duration: '40 hrs',
-    level: 'Advanced',
+    level: '3rd Professional',
     language: 'Sanskrit + English',
     subject: 'Samhita',
     tags: ['classical', 'samhita', 'charak', 'advanced'],

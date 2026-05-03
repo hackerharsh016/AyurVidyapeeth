@@ -13,6 +13,8 @@ import Avatar from '@mui/material/Avatar';
 import Tabs from '@mui/material/Tabs';
 import Tab from '@mui/material/Tab';
 import { motion } from 'framer-motion';
+import { supabase } from '../../supabase/supabase';
+import { generateCertificate } from '../../utils/certificateGenerator';
 import PageLayout from '../../components/PageLayout';
 import { useCourseStore } from '../../stores/courseStore';
 import { useProgressStore } from '../../stores/progressStore';
@@ -22,14 +24,54 @@ export default function LearningPage() {
   const navigate = useNavigate();
   const { enrolledCourses, courses, wishlist } = useCourseStore();
   const { getCourseProgress } = useProgressStore();
-  const { isAuthenticated } = useAuthStore();
+  const { isAuthenticated, user } = useAuthStore();
   const [tab, setTab] = useState(0);
+  const [downloadingCert, setDownloadingCert] = useState<string | null>(null);
 
   const enrolledCourseData = enrolledCourses
     .map(e => ({ ...e, course: courses.find(c => c.id === e.courseId) }))
     .filter(e => e.course);
 
   const wishlistCourses = courses.filter(c => wishlist.includes(c.id));
+
+  const handleDownloadCertificate = async (course: any) => {
+    if (!user) return;
+    
+    setDownloadingCert(course.id);
+    try {
+      // 1. Get Template URL
+      const { data: certSettings } = await supabase
+        .from('certificate_settings')
+        .select('template_url')
+        .single();
+        
+      if (!certSettings?.template_url) {
+        alert("Certificate template not configured by admin yet.");
+        return;
+      }
+
+      // 2. Generate PDF
+      const pdfBytes = await generateCertificate(certSettings.template_url, {
+        studentName: user.name || "Student",
+        courseName: course.title,
+        date: new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' }),
+        certificateId: `CERT-${course.id.substring(0, 8)}-${user.id.substring(0, 4)}`.toUpperCase(),
+        creatorName: course.instructor || "AyurVidyapeeth Expert"
+      });
+
+      // 3. Trigger Download
+      const blob = new Blob([pdfBytes as any], { type: 'application/pdf' });
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(blob);
+      link.download = `Certificate_${course.title.replace(/\s+/g, '_')}.pdf`;
+      link.click();
+    } catch (error) {
+      console.error(error);
+      alert("Failed to generate certificate.");
+    } finally {
+      setDownloadingCert(null);
+    }
+  };
 
   if (!isAuthenticated) {
     return (
@@ -164,6 +206,20 @@ export default function LearningPage() {
                             >
                               {progress === 0 ? '▶ Start Learning' : progress === 100 ? '🔁 Review' : '▶ Continue'}
                             </Button>
+
+                            {progress === 100 && course.certificate && (
+                              <Button
+                                variant="outlined"
+                                color="secondary"
+                                fullWidth
+                                size="small"
+                                sx={{ mt: 1 }}
+                                onClick={(e) => { e.stopPropagation(); handleDownloadCertificate(course); }}
+                                disabled={downloadingCert === course.id}
+                              >
+                                {downloadingCert === course.id ? 'Generating...' : '🎓 Download Certificate'}
+                              </Button>
+                            )}
                           </CardContent>
                         </Card>
                       </motion.div>

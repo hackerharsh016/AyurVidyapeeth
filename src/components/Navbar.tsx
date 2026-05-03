@@ -25,6 +25,7 @@ const navLinks = [
   { label: 'Directory', path: '/directory' },
   { label: 'Resources', path: '/resources' },
   { label: 'Courses', path: '/courses' },
+  { label: 'Tests', path: '/tests' },
   { label: 'Learning', path: '/learning' },
 ];
 

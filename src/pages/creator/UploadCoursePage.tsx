@@ -27,6 +27,7 @@ import PageLayout from '../../components/PageLayout';
 import { useCourseStore } from '../../stores/courseStore';
 import { useAuthStore } from '../../stores/authStore';
 import type { Course, Section, Lesson } from '../../data/courses';
+import { SUBJECTS } from '../../constants/subjects';
 
 const steps = ['Basic Info', 'Course Details', 'Curriculum', 'Review & Submit'];
 
@@ -41,12 +42,13 @@ export default function UploadCoursePage() {
     title: '',
     subtitle: '',
     price: '',
-    level: 'Beginner' as 'Beginner' | 'Intermediate' | 'Advanced',
-    subject: 'Dravyaguna',
+    level: '1st Professional' as '1st Professional' | '2nd Professional' | '3rd Professional',
+    subject: SUBJECTS[0],
     category: 'Pharmacology',
     language: 'English',
     description: '',
     whatYouLearn: ['', '', '', ''],
+    hasCertificate: false,
   });
 
   const [sections, setSections] = useState<(Omit<Section, 'lessons'> & { lessons: Omit<Lesson, never>[] })[]>([
@@ -116,7 +118,7 @@ export default function UploadCoursePage() {
       reviews: [],
       category: form.category,
       free: parseFloat(form.price) === 0,
-      certificate: true,
+      certificate: form.hasCertificate,
       totalLessons: sections.reduce((sum, s) => sum + s.lessons.length, 0),
       totalPdfs: 0,
       status: 'pending',
@@ -171,7 +173,7 @@ export default function UploadCoursePage() {
                       <FormControl fullWidth>
                         <InputLabel>Subject</InputLabel>
                         <Select value={form.subject} onChange={e => updateField('subject', e.target.value)} label="Subject">
-                          {['Dravyaguna', 'Panchakarma', 'Sharir Rachana', 'Nadi Pariksha', 'Ahara', 'Samhita', 'Kriya Sharira', 'Roga Nidana'].map(s => (
+                          {SUBJECTS.map(s => (
                             <MenuItem key={s} value={s}>{s}</MenuItem>
                           ))}
                         </Select>
@@ -179,9 +181,9 @@ export default function UploadCoursePage() {
                     </Grid>
                     <Grid size={{ xs: 12, sm: 6 }}>
                       <FormControl fullWidth>
-                        <InputLabel>Level</InputLabel>
-                        <Select value={form.level} onChange={e => updateField('level', e.target.value as 'Beginner' | 'Intermediate' | 'Advanced')} label="Level">
-                          {['Beginner', 'Intermediate', 'Advanced'].map(l => <MenuItem key={l} value={l}>{l}</MenuItem>)}
+                        <InputLabel>Professional Year</InputLabel>
+                        <Select value={form.level} onChange={e => updateField('level', e.target.value as '1st Professional' | '2nd Professional' | '3rd Professional')} label="Professional Year">
+                          {['1st Professional', '2nd Professional', '3rd Professional'].map(l => <MenuItem key={l} value={l}>{l}</MenuItem>)}
                         </Select>
                       </FormControl>
                     </Grid>
@@ -203,6 +205,21 @@ export default function UploadCoursePage() {
                           {['English', 'Hindi', 'Hindi + English', 'Sanskrit + English', 'Tamil', 'Malayalam'].map(l => <MenuItem key={l} value={l}>{l}</MenuItem>)}
                         </Select>
                       </FormControl>
+                    </Grid>
+                    <Grid size={12}>
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, p: 2, bgcolor: 'rgba(14,91,68,0.04)', borderRadius: 3, border: '1px solid', borderColor: 'rgba(14,91,68,0.1)' }}>
+                        <Box sx={{ flex: 1 }}>
+                          <Typography variant="subtitle2" fontWeight={700}>Enable Course Certificate</Typography>
+                          <Typography variant="caption" color="text.secondary">Students will receive a professional certificate upon 100% completion of this course.</Typography>
+                        </Box>
+                        <Button 
+                          variant={form.hasCertificate ? "contained" : "outlined"}
+                          onClick={() => setForm(f => ({ ...f, hasCertificate: !f.hasCertificate }))}
+                          sx={{ borderRadius: 2 }}
+                        >
+                          {form.hasCertificate ? "Enabled" : "Disabled"}
+                        </Button>
+                      </Box>
                     </Grid>
                   </Grid>
                 </CardContent>
@@ -351,6 +368,7 @@ export default function UploadCoursePage() {
                       { label: 'Level', value: form.level },
                       { label: 'Price', value: form.price ? `₹${form.price}` : 'Free' },
                       { label: 'Language', value: form.language },
+                      { label: 'Certificate', value: form.hasCertificate ? 'Yes' : 'No' },
                       { label: 'Total Sections', value: sections.length.toString() },
                       { label: 'Total Lessons', value: sections.reduce((sum, s) => sum + s.lessons.length, 0).toString() },
                     ].map(item => (

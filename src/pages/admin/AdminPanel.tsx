@@ -49,6 +49,7 @@ import DeleteIcon from '@mui/icons-material/Delete';
 import AddIcon from '@mui/icons-material/Add';
 import WebIcon from '@mui/icons-material/Web';
 import PictureAsPdfIcon from '@mui/icons-material/PictureAsPdf';
+import BadgeIcon from '@mui/icons-material/Badge';
 import LinearProgress from '@mui/material/LinearProgress';
 
 import { motion, AnimatePresence } from 'framer-motion';
@@ -99,7 +100,7 @@ interface EnrollmentWithCourse {
   } | null;
 }
 
-type AdminView = 'home' | 'homepage' | 'students' | 'creators' | 'courses' | 'approvals' | 'directory';
+type AdminView = 'home' | 'homepage' | 'students' | 'creators' | 'courses' | 'approvals' | 'directory' | 'certificates';
 
 interface DirectoryEntry {
   id?: string;
@@ -148,6 +149,11 @@ export default function AdminPanel() {
   const [directoryForm, setDirectoryForm] = useState<DirectoryEntry>(emptyDirectoryForm);
   const [editorMode, setEditorMode] = useState<'visual' | 'html'>('visual');
 
+  // Certificate settings
+  const [certTemplateUrl, setCertTemplateUrl] = useState<string | null>(null);
+  const [certUploading, setCertUploading] = useState(false);
+  const certInputRef = useRef<HTMLInputElement | null>(null);
+
   const fetchData = async () => {
     setLoading(true);
     setDebugInfo(null);
@@ -164,18 +170,20 @@ export default function AdminPanel() {
         .select('*')
         .eq('role', 'student');
 
-      const [enRes, crRes, coursesCountRes, topicsRes, directoryRes] = await Promise.all([
+      const [enRes, crRes, coursesCountRes, topicsRes, directoryRes, certRes] = await Promise.all([
         supabase.from('enrollments').select('user_id, courses(price)'),
         supabase.from('courses').select('creator_id'),
         supabase.from('courses').select('*', { count: 'exact', head: true }),
         supabase.from('homepage_topics').select('*').order('sort_order', { ascending: true }),
-        supabase.from('directory_entries').select('*').order('created_at', { ascending: false })
+        supabase.from('directory_entries').select('*').order('created_at', { ascending: false }),
+        supabase.from('certificate_settings').select('template_url').single()
       ]);
 
       const enrollments = (enRes.data as unknown as EnrollmentWithCourse[]) || [];
       const ownedCourses = crRes.data || [];
       const totalCourses = coursesCountRes.count || 0;
       setHomepageTopics(topicsRes.data || []);
+      setCertTemplateUrl(certRes.data?.template_url || null);
       
       const mappedDirectory = (directoryRes.data || []).map((entry: any) => ({
         ...entry,
@@ -226,6 +234,39 @@ export default function AdminPanel() {
       setDebugInfo(`Fetch failed: ${error.message}`);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleUploadCertificate = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    
+    setCertUploading(true);
+    try {
+      const fileExt = file.name.split('.').pop();
+      const fileName = `certificate_template_${Date.now()}.${fileExt}`;
+      
+      const { error: uploadError } = await supabase.storage
+        .from('assets')
+        .upload(fileName, file);
+      
+      if (uploadError) throw uploadError;
+      
+      const { data: { publicUrl } } = supabase.storage.from('assets').getPublicUrl(fileName);
+      
+      const { error: dbError } = await supabase
+        .from('certificate_settings')
+        .update({ template_url: publicUrl })
+        .eq('id', (await supabase.from('certificate_settings').select('id').single()).data?.id);
+        
+      if (dbError) throw dbError;
+      
+      setCertTemplateUrl(publicUrl);
+      setToast({ open: true, message: 'Certificate template uploaded!', severity: 'success' });
+    } catch (err: any) {
+      setToast({ open: true, message: `Upload failed: ${err.message}`, severity: 'error' });
+    } finally {
+      setCertUploading(false);
     }
   };
 
@@ -339,6 +380,7 @@ export default function AdminPanel() {
     { id: 'students', label: 'Students', icon: <SchoolIcon /> },
     { id: 'creators', label: 'Creators', icon: <PersonIcon /> },
     { id: 'courses', label: 'All Courses', icon: <MenuBookIcon /> },
+    { id: 'certificates', label: 'Certificates', icon: <BadgeIcon /> },
     { id: 'approvals', label: 'Requests', icon: <FactCheckIcon />, badge: pendingCourses.length },
   ];
 
@@ -847,7 +889,7 @@ export default function AdminPanel() {
                                     <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mb: 3 }}>
                                       {[
                                         { label: 'Category', val: course.subject },
-                                        { label: 'Level', val: course.level },
+                                        { label: 'Year', val: course.level },
                                         { label: 'Language', val: course.language },
                                         { label: 'Lessons', val: course.totalLessons },
                                       ].map(b => (
@@ -881,6 +923,101 @@ export default function AdminPanel() {
                           ))}
                         </Box>
                       )}
+                    </>
+                  )}
+
+                  {/* Certificates View */}
+                  {view === 'certificates' && (
+                    <>
+                      <Box sx={{ mb: 4 }}>
+                        <Typography variant="h4" fontWeight={700} gutterBottom>Certificate Engine</Typography>
+                        <Typography variant="body2" color="text.secondary">Upload the master PDF template for course completion certificates.</Typography>
+                      </Box>
+
+                      <Grid container spacing={4}>
+                        <Grid size={{ xs: 12, md: 6 }}>
+                          <Card elevation={0} sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 4 }}>
+                            <CardContent sx={{ p: 4 }}>
+                              <Typography variant="h6" fontWeight={700} mb={1}>Template Upload</Typography>
+                              <Typography variant="body2" color="text.secondary" mb={4}>
+                                Upload a landscape PDF template. The system will automatically place the student's name, course, and date in the center.
+                              </Typography>
+
+                              <input
+                                type="file"
+                                accept="application/pdf"
+                                style={{ display: 'none' }}
+                                ref={certInputRef}
+                                onChange={handleUploadCertificate}
+                              />
+
+                              <Box 
+                                sx={{ 
+                                  border: '2px dashed', 
+                                  borderColor: certTemplateUrl ? 'success.main' : 'divider', 
+                                  borderRadius: 4, 
+                                  p: 6, 
+                                  textAlign: 'center', 
+                                  cursor: 'pointer',
+                                  bgcolor: certTemplateUrl ? 'rgba(14,91,68,0.02)' : 'transparent',
+                                  transition: 'all 0.2s',
+                                  '&:hover': { borderColor: 'primary.main', bgcolor: 'rgba(14,91,68,0.04)' }
+                                }}
+                                onClick={() => certInputRef.current?.click()}
+                              >
+                                <PictureAsPdfIcon sx={{ fontSize: 64, color: certTemplateUrl ? '#DC2626' : 'text.disabled', mb: 2 }} />
+                                {certUploading ? (
+                                  <Box sx={{ width: '100%', mt: 2 }}>
+                                    <LinearProgress sx={{ borderRadius: 2 }} />
+                                    <Typography variant="caption" sx={{ mt: 1, display: 'block' }}>Uploading master template...</Typography>
+                                  </Box>
+                                ) : certTemplateUrl ? (
+                                  <>
+                                    <Typography variant="body1" fontWeight={700} color="success.main">Active Template Loaded</Typography>
+                                    <Typography variant="caption" color="text.secondary">Click to replace with a new PDF</Typography>
+                                  </>
+                                ) : (
+                                  <>
+                                    <Typography variant="body1" fontWeight={700}>Drag & Drop or Click to Upload</Typography>
+                                    <Typography variant="caption" color="text.secondary">Supported: Landscape PDF files (max 10MB)</Typography>
+                                  </>
+                                )}
+                              </Box>
+
+                              <Box sx={{ mt: 4, p: 2, bgcolor: 'rgba(0,0,0,0.03)', borderRadius: 2 }}>
+                                <Typography variant="caption" fontWeight={700} display="block" mb={1} color="text.secondary">DYNAMIC FIELDS MAPPED:</Typography>
+                                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+                                  {['{student_name}', '{course_title}', '{completion_date}', '{certificate_id}', '{instructor}'].map(f => (
+                                    <Chip key={f} label={f} size="small" sx={{ fontFamily: 'monospace', fontSize: '0.7rem' }} />
+                                  ))}
+                                </Box>
+                              </Box>
+                            </CardContent>
+                          </Card>
+                        </Grid>
+
+                        <Grid size={{ xs: 12, md: 6 }}>
+                          <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+                            <Typography variant="subtitle2" fontWeight={700} gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                              <VisibilityIcon fontSize="small" /> Template Preview
+                            </Typography>
+                            <Card elevation={0} sx={{ flex: 1, border: '1px solid', borderColor: 'divider', borderRadius: 4, overflow: 'hidden', minHeight: 400, bgcolor: '#f1f5f9', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                              {certTemplateUrl ? (
+                                <iframe 
+                                  src={`${certTemplateUrl}#toolbar=0&navpanes=0`} 
+                                  style={{ width: '100%', height: '100%', border: 'none' }} 
+                                  title="Certificate Preview"
+                                />
+                              ) : (
+                                <Box sx={{ textAlign: 'center', opacity: 0.3 }}>
+                                  <PictureAsPdfIcon sx={{ fontSize: 80, mb: 2 }} />
+                                  <Typography>No template uploaded yet</Typography>
+                                </Box>
+                              )}
+                            </Card>
+                          </Box>
+                        </Grid>
+                      </Grid>
                     </>
                   )}
                 </Box>
